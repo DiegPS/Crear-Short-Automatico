@@ -227,7 +227,7 @@ You can load it on http://localhost:3123
 
 | key | description | default |
 | --- | --- | --- |
-| WHISPER_MODEL | Which whisper.cpp model to use. Valid options are `tiny`, `tiny.en`, `base`, `base.en`, `small`, `small.en`, `medium`, `medium.en`, `large-v1`, `large-v2`, `large-v3`, `large-v3-turbo` | Depends, see the descriptions of the docker images above. For npm, the default option is `medium.en` |
+| WHISPER_MODEL | Which whisper.cpp model to use. Valid options are `tiny`, `tiny.en`, `base`, `base.en`, `small`, `small.en`, `medium`, `medium.en`, `large-v1`, `large-v2`, `large-v3`, `large-v3-turbo` | Depends, see the descriptions of the docker images above. For npm, the default option is `base.en` |
 | DATA_DIR_PATH | the data directory of the project | `~/.ai-agents-az-video-generator` with npm, `/app/data` in the Docker images |
 | DOCKER | whether the project is running in a Docker container | `true` for the docker images, otherwise `false` |
 | DEV | guess! :) | `false` |
@@ -478,7 +478,7 @@ No
 | Dependency                                             | Version  | License                                                                           | Purpose                         |
 | ------------------------------------------------------ | -------- | --------------------------------------------------------------------------------- | ------------------------------- |
 | [Remotion](https://remotion.dev/)                      | ^4.0.286 | [Remotion License](https://github.com/remotion-dev/remotion/blob/main/LICENSE.md) | Video composition and rendering |
-| [Whisper CPP](https://github.com/ggml-org/whisper.cpp) | v1.5.5   | MIT                                                                               | Speech-to-text for captions     |
+| [Whisper CPP](https://github.com/ggml-org/whisper.cpp) | v1.7.1   | MIT                                                                               | Speech-to-text for captions     |
 | [FFmpeg](https://ffmpeg.org/)                          | ^2.1.3   | LGPL/GPL                                                                          | Audio/video manipulation        |
 | [Kokoro.js](https://www.npmjs.com/package/kokoro-js)   | ^1.2.0   | MIT                                                                               | Text-to-speech generation       |
 | [Pexels API](https://www.pexels.com/api/)              | N/A      | [Pexels Terms](https://www.pexels.com/license/)                                   | Background videos               |
