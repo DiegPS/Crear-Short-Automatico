@@ -215,6 +215,7 @@ test("test me", async () => {
   expect(videos.find((v) => v.id === videoId)?.status).toBe("ready");
 
   // check the status of the video directly
-  const status = shortCreator.status(videoId);
+  const statusResult = shortCreator.status(videoId);
+  const status = typeof statusResult === 'string' ? statusResult : statusResult.status;
   expect(status).toBe("ready");
 });

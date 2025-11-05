@@ -37,12 +37,18 @@ export class MCPRouter {
         videoId: z.string().describe("The ID of the video"),
       },
       async ({ videoId }) => {
-        const status = this.shortCreator.status(videoId);
+        const statusResult = this.shortCreator.status(videoId);
+        // Handle both old format (string) and new format (object with progress)
+        const status = typeof statusResult === 'string' ? statusResult : statusResult.status;
+        const progress = typeof statusResult === 'object' ? statusResult.progress : undefined;
+        const statusText = progress !== undefined 
+          ? `${status} (${progress}% complete)` 
+          : status;
         return {
           content: [
             {
               type: "text",
-              text: status,
+              text: statusText,
             },
           ],
         };

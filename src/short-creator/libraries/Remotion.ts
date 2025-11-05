@@ -79,6 +79,7 @@ export class Remotion {
     data: z.infer<typeof shortVideoSchema>,
     id: string,
     orientation: OrientationEnum,
+    onProgressUpdate?: (progress: number) => void,
   ) {
     try {
       const { component } = getOrientationConfig(orientation);
@@ -97,13 +98,18 @@ export class Remotion {
       const outputLocation = path.join(this.config.videosDirPath, `${id}.mp4`);
       
       const onProgressCallback: RenderMediaOnProgress = ({ progress }) => {
+        const progressPercent = Math.floor(progress * 100);
         logger.debug(
           {
             videoID: id,
-            progress: Math.floor(progress * 100),
+            progress: progressPercent,
           },
           `Rendering ${id}`
         );
+        // Call the external progress update callback if provided
+        if (onProgressUpdate) {
+          onProgressUpdate(progress);
+        }
       };
 
       await this.renderWithRetry(composition, outputLocation, data, onProgressCallback);

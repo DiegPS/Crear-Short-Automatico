@@ -32,6 +32,7 @@ export class ShortCreator {
     config: RenderConfig;
     id: string;
   }[] = [];
+  private progressMap: Map<string, number> = new Map();
   constructor(
     private config: Config,
     private remotion: Remotion,
@@ -42,14 +43,21 @@ export class ShortCreator {
     private musicManager: MusicManager,
   ) {}
 
-  public status(id: string): VideoStatus {
+  public status(id: string): VideoStatus | { status: VideoStatus; progress?: number } {
     const videoPath = this.getVideoPath(id);
-    if (this.queue.find((item) => item.id === id)) {
-      return "processing";
+    const isInQueue = this.queue.find((item) => item.id === id);
+    const progress = this.progressMap.get(id);
+    
+    if (isInQueue) {
+      return { status: "processing", progress };
     }
     if (fs.existsSync(videoPath)) {
+      // Clean up progress when video is ready
+      this.progressMap.delete(id);
       return "ready";
     }
+    // Clean up progress when video failed
+    this.progressMap.delete(id);
     return "failed";
   }
 
@@ -172,6 +180,9 @@ export class ShortCreator {
     const selectedMusic = this.findMusic(totalDuration, config.music);
     logger.debug({ selectedMusic }, "Selected music for the video");
 
+    // Initialize progress
+    this.progressMap.set(videoId, 0);
+
     await this.remotion.render(
       {
         music: selectedMusic,
@@ -188,7 +199,14 @@ export class ShortCreator {
       },
       videoId,
       orientation,
+      (progress) => {
+        // Update progress in the map
+        this.progressMap.set(videoId, Math.floor(progress * 100));
+      },
     );
+
+    // Clean up progress when rendering is complete
+    this.progressMap.delete(videoId);
 
     for (const file of tempFiles) {
       fs.removeSync(file);

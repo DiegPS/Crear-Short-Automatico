@@ -88,10 +88,15 @@ export class APIRouter {
           });
           return;
         }
-        const status = this.shortCreator.status(videoId);
-        res.status(200).json({
-          status,
-        });
+        const statusResult = this.shortCreator.status(videoId);
+        // Handle both old format (string) and new format (object with progress)
+        if (typeof statusResult === 'string') {
+          res.status(200).json({
+            status: statusResult,
+          });
+        } else {
+          res.status(200).json(statusResult);
+        }
       },
     );
 

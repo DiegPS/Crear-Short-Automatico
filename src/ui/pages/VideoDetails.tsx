@@ -26,6 +26,7 @@ import { VideoStatus } from '../../types/shorts';
 
 interface VideoStatusResponse {
   status: VideoStatus;
+  progress?: number;
 }
 
 const fetchVideoStatus = async (videoId: string): Promise<VideoStatusResponse> => {
@@ -50,6 +51,7 @@ const VideoDetails: React.FC = () => {
   });
 
   const status = statusData?.status || 'processing';
+  const progress = statusData?.progress;
 
   const handleBack = () => {
     navigate('/');
@@ -133,14 +135,25 @@ const VideoDetails: React.FC = () => {
             <Typography variant="body1" color="text.secondary" sx={{ mb: 3 }}>
               {statusConfig.description}
             </Typography>
-            <LinearProgress 
-              sx={{ 
-                maxWidth: 400, 
-                mx: 'auto',
-                height: 8,
-                borderRadius: 4,
-              }} 
-            />
+            <Box sx={{ maxWidth: 400, mx: 'auto', mb: 2 }}>
+              <LinearProgress 
+                variant={progress !== undefined ? "determinate" : "indeterminate"}
+                value={progress}
+                sx={{ 
+                  height: 8,
+                  borderRadius: 4,
+                }} 
+              />
+              {progress !== undefined && (
+                <Typography 
+                  variant="body2" 
+                  color="text.secondary" 
+                  sx={{ mt: 1, textAlign: 'center' }}
+                >
+                  {progress}%
+                </Typography>
+              )}
+            </Box>
             <Box mt={3}>
               <Chip
                 icon={statusConfig.icon}
