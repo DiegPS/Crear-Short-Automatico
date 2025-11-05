@@ -408,5 +408,147 @@ export class APIRouter {
         }
       },
     );
+
+    // Audio management endpoints
+    this.router.post(
+      "/audio",
+      async (req: ExpressRequest, res: ExpressResponse) => {
+        const fileReq = req as FileUploadRequest;
+        try {
+          if (!fileReq.files || !fileReq.files.audio) {
+            res.status(400).json({
+              error: "No audio file provided",
+            });
+            return;
+          }
+
+          const audioFile = fileReq.files.audio;
+          if (Array.isArray(audioFile)) {
+            res.status(400).json({
+              error: "Multiple files not allowed",
+            });
+            return;
+          }
+
+          const allowedTypes = ['audio/mpeg', 'audio/mp3', 'audio/wav', 'audio/wave', 'audio/x-wav', 'audio/mp4', 'audio/m4a', 'audio/ogg', 'audio/webm'];
+          if (!allowedTypes.includes(audioFile.mimetype)) {
+            res.status(400).json({
+              error: "Invalid file type. Only MP3, WAV, M4A, OGG and WEBM are allowed.",
+            });
+            return;
+          }
+
+          if (audioFile.size > 50 * 1024 * 1024) { // 50MB limit
+            res.status(400).json({
+              error: "File size too large. Maximum size is 50MB.",
+            });
+            return;
+          }
+
+          const ext = path.extname(audioFile.name);
+          const audioId = cuid();
+          const filename = `${audioId}${ext}`;
+          const filepath = path.join(this.config.audioDirPath, filename);
+
+          await audioFile.mv(filepath);
+          res.status(201).json({
+            audioId,
+          });
+        } catch (error: unknown) {
+          logger.error(error, "Error uploading audio");
+          res.status(400).json({
+            error: "Failed to upload audio",
+            message: error instanceof Error ? error.message : "Unknown error",
+          });
+        }
+      },
+    );
+
+    this.router.get(
+      "/audio/:audioId",
+      async (req: ExpressRequest, res: ExpressResponse) => {
+        try {
+          const { audioId } = req.params;
+          if (!audioId) {
+            res.status(400).json({
+              error: "audioId is required",
+            });
+            return;
+          }
+
+          const files = await fs.readdir(this.config.audioDirPath);
+          const audioFile = files.find(file => file.startsWith(audioId));
+
+          if (!audioFile) {
+            res.status(404).json({
+              error: "Audio not found",
+            });
+            return;
+          }
+
+          const fullPath = path.join(this.config.audioDirPath, audioFile);
+          const ext = path.extname(audioFile).toLowerCase();
+          const mimeType = {
+            '.mp3': 'audio/mpeg',
+            '.wav': 'audio/wav',
+            '.wave': 'audio/wav',
+            '.m4a': 'audio/mp4',
+            '.ogg': 'audio/ogg',
+            '.webm': 'audio/webm',
+          }[ext] || 'application/octet-stream';
+
+          res.setHeader('Content-Type', mimeType);
+          res.sendFile(fullPath);
+        } catch (error: unknown) {
+          logger.error(error, "Error getting audio");
+          res.status(404).json({
+            error: "Audio not found",
+          });
+        }
+      },
+    );
+
+    this.router.get(
+      "/audio",
+      async (req: ExpressRequest, res: ExpressResponse) => {
+        try {
+          const audios = this.shortCreator.listAllAudios();
+          res.status(200).json({ 
+            audios,
+            total: audios.length,
+            processing: audios.filter(audio => audio.status === "processing").length,
+            ready: audios.filter(audio => audio.status === "ready").length
+          });
+        } catch (error: unknown) {
+          logger.error(error, "Error listing audios");
+          res.status(500).json({
+            error: "Failed to list audios",
+          });
+        }
+      },
+    );
+
+    this.router.delete(
+      "/audio/:audioId",
+      async (req: ExpressRequest, res: ExpressResponse) => {
+        try {
+          const { audioId } = req.params;
+          if (!audioId) {
+            res.status(400).json({
+              error: "audioId is required",
+            });
+            return;
+          }
+
+          this.shortCreator.deleteAudio(audioId);
+          res.status(200).json({ success: true });
+        } catch (error: unknown) {
+          logger.error(error, "Error deleting audio");
+          res.status(404).json({
+            error: "Audio not found",
+          });
+        }
+      },
+    );
   }
 }

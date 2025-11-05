@@ -5,6 +5,7 @@ import VideoCreator from './pages/VideoCreator';
 import VideoDetails from './pages/VideoDetails';
 import ImageList from './pages/ImageList';
 import ImageDetails from './pages/ImageDetails';
+import AudioList from './pages/AudioList';
 import Layout from './components/Layout';
 
 const App: React.FC = () => {
@@ -17,6 +18,7 @@ const App: React.FC = () => {
           <Route path="/video/:videoId" element={<VideoDetails />} />
           <Route path="/images" element={<ImageList />} />
           <Route path="/image/:imageId" element={<ImageDetails />} />
+          <Route path="/audios" element={<AudioList />} />
         </Routes>
       </Layout>
     </Router>

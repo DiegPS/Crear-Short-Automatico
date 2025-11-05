@@ -32,13 +32,20 @@ export type Scene = {
 };
 
 export const sceneInput = z.object({
-  text: z.string().describe("Text to be spoken in the video"),
+  text: z.string().optional().describe("Text to be spoken in the video (required if audioId is not provided)"),
+  audioId: z.string().optional().describe("ID of uploaded audio file (required if text is not provided)"),
   searchTerms: z
     .array(z.string())
     .describe(
       "Search term for video, 1 word, and at least 2-3 search terms should be provided for each scene. Make sure to match the overall context with the word - regardless what the video search result would be.",
     ),
-});
+}).refine(
+  (data) => data.text || data.audioId,
+  {
+    message: "Either 'text' or 'audioId' must be provided",
+    path: ["text"],
+  }
+);
 export type SceneInput = z.infer<typeof sceneInput>;
 
 export enum VoiceEnum {

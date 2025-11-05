@@ -18,6 +18,7 @@ import {
 import VideoIcon from '@mui/icons-material/VideoLibrary';
 import AddIcon from '@mui/icons-material/Add';
 import ImageIcon from '@mui/icons-material/Image';
+import AudioFileIcon from '@mui/icons-material/AudioFile';
 import HomeIcon from '@mui/icons-material/Home';
 
 interface LayoutProps {
@@ -200,6 +201,21 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
                 }}
               >
                 {!isMobile && 'Images'}
+              </Button>
+              
+              <Button 
+                color="inherit" 
+                startIcon={<AudioFileIcon />}
+                onClick={() => navigate('/audios')}
+                sx={{ 
+                  color: isActive('/audios') ? 'primary.main' : 'text.secondary',
+                  bgcolor: isActive('/audios') ? alpha(theme.palette.primary.main, 0.1) : 'transparent',
+                  '&:hover': {
+                    bgcolor: alpha(theme.palette.primary.main, 0.1),
+                  },
+                }}
+              >
+                {!isMobile && 'Audios'}
               </Button>
               
               <Button 

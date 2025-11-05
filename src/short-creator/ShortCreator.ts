@@ -118,29 +118,232 @@ export class ShortCreator {
 
     let index = 0;
     for (const scene of inputScenes) {
-      const audio = await this.kokoro.generate(
-        scene.text,
-        config.voice ?? "af_heart",
-      );
-      let { audioLength } = audio;
-      const { audio: audioStream } = audio;
+      let audioLength: number;
+      let audioStream: ArrayBuffer;
+      let tempWavPath: string;
+      let tempMp3Path: string;
+      const tempId = cuid();
+      const tempWavFileName = `${tempId}.wav`;
+      const tempMp3FileName = `${tempId}.mp3`;
+      tempWavPath = path.join(this.config.tempDirPath, tempWavFileName);
+      tempMp3Path = path.join(this.config.tempDirPath, tempMp3FileName);
+      tempFiles.push(tempWavPath, tempMp3Path);
+
+      // Check if scene has audioId (uploaded audio) or text (Kokoro generation)
+      if ('audioId' in scene && scene.audioId) {
+        // Use uploaded audio - skip Kokoro
+        const audioId = scene.audioId; // Type narrowing
+        logger.debug({ audioId }, "Using uploaded audio, skipping Kokoro");
+        
+        // Find the audio file
+        const audioFiles = fs.readdirSync(this.config.audioDirPath);
+        const audioFile = audioFiles.find(file => file.startsWith(audioId));
+        
+        if (!audioFile) {
+          throw new Error(`Audio file with ID ${audioId} not found`);
+        }
+
+        const audioFilePath = path.join(this.config.audioDirPath, audioFile);
+        
+        // Get audio duration
+        const fullAudioDuration = await this.ffmpeg.getAudioDuration(audioFilePath);
+        const maxSegmentDuration = 15; // Maximum 15 seconds per segment
+        const minPauseDuration = 500; // Minimum pause duration in ms to consider a cut point
+        
+        // If audio is longer than maxSegmentDuration, split it intelligently
+        if (fullAudioDuration > maxSegmentDuration) {
+          logger.debug(
+            { audioId, fullAudioDuration, maxSegmentDuration },
+            "Audio is too long, splitting into multiple segments intelligently",
+          );
+          
+          // First, transcribe the full audio to get natural pause points
+          const fullTempWavPath = path.join(this.config.tempDirPath, `full_${tempId}.wav`);
+          tempFiles.push(fullTempWavPath);
+          await this.ffmpeg.normalizeAudioFile(audioFilePath, fullTempWavPath);
+          const fullCaptions = await this.whisper.CreateCaption(fullTempWavPath);
+          
+          // Find natural cut points (pauses between captions and sentence endings)
+          const cutPoints: number[] = [0]; // Always start at 0
+          
+          for (let i = 0; i < fullCaptions.length - 1; i++) {
+            const currentCaption = fullCaptions[i];
+            const nextCaption = fullCaptions[i + 1];
+            const pauseDuration = nextCaption.startMs - currentCaption.endMs;
+            
+            // Check if there's a significant pause (natural break)
+            if (pauseDuration >= minPauseDuration) {
+              // Also check if it's at the end of a sentence
+              const textEndsSentence = /[.!?]\s*$/.test(currentCaption.text.trim());
+              if (textEndsSentence || pauseDuration >= minPauseDuration * 2) {
+                // Add cut point at the end of current caption (or slightly after)
+                const cutPoint = (currentCaption.endMs + 100) / 1000; // Convert to seconds, add small buffer
+                if (cutPoint < fullAudioDuration && cutPoint > cutPoints[cutPoints.length - 1] + 3) {
+                  // Ensure minimum 3 seconds between cuts
+                  cutPoints.push(cutPoint);
+                }
+              }
+            }
+          }
+          
+          // Ensure we don't exceed maxSegmentDuration
+          const optimizedCutPoints: number[] = [0];
+          let lastCut = 0;
+          
+          for (let i = 1; i < cutPoints.length; i++) {
+            const durationSinceLastCut = cutPoints[i] - lastCut;
+            if (durationSinceLastCut > maxSegmentDuration) {
+              // Need intermediate cut - find best point before maxSegmentDuration
+              const targetCut = lastCut + maxSegmentDuration;
+              // Find the closest natural cut point before target
+              let bestCut = targetCut;
+              for (let j = i - 1; j >= 0 && cutPoints[j] >= lastCut; j--) {
+                if (cutPoints[j] <= targetCut && cutPoints[j] > lastCut + 5) {
+                  bestCut = cutPoints[j];
+                  break;
+                }
+              }
+              optimizedCutPoints.push(bestCut);
+              lastCut = bestCut;
+              i--; // Re-check this point
+            } else if (i === cutPoints.length - 1 || cutPoints[i + 1] - lastCut > maxSegmentDuration) {
+              // This is a good cut point
+              optimizedCutPoints.push(cutPoints[i]);
+              lastCut = cutPoints[i];
+            }
+          }
+          
+          // Add final cut point if needed
+          if (optimizedCutPoints[optimizedCutPoints.length - 1] < fullAudioDuration - 1) {
+            optimizedCutPoints.push(fullAudioDuration);
+          }
+          
+          logger.debug(
+            { cutPoints: optimizedCutPoints, originalCutPoints: cutPoints },
+            "Determined natural cut points for audio splitting",
+          );
+          
+          // Process each segment as a separate scene
+          for (let segmentIndex = 0; segmentIndex < optimizedCutPoints.length - 1; segmentIndex++) {
+            const segmentStart = optimizedCutPoints[segmentIndex];
+            const segmentLength = optimizedCutPoints[segmentIndex + 1] - segmentStart;
+            
+            const segmentTempId = cuid();
+            const segmentWavFileName = `${segmentTempId}.wav`;
+            const segmentMp3FileName = `${segmentTempId}.mp3`;
+            const segmentWavPath = path.join(this.config.tempDirPath, segmentWavFileName);
+            const segmentMp3Path = path.join(this.config.tempDirPath, segmentMp3FileName);
+            tempFiles.push(segmentWavPath, segmentMp3Path);
+            
+            // Extract audio segment for Whisper
+            await this.ffmpeg.splitAudioForWhisper(
+              audioFilePath,
+              segmentStart,
+              segmentLength,
+              segmentWavPath,
+            );
+            
+            // Extract audio segment as MP3
+            await this.ffmpeg.splitAudioFile(
+              audioFilePath,
+              segmentStart,
+              segmentLength,
+              segmentMp3Path,
+            );
+            
+            // Filter captions for this segment (adjust timestamps relative to segment start)
+            const segmentStartMs = segmentStart * 1000;
+            const segmentEndMs = (segmentStart + segmentLength) * 1000;
+            const segmentCaptions = fullCaptions
+              .filter(caption => {
+                // Caption overlaps with this segment
+                return (caption.startMs >= segmentStartMs && caption.startMs < segmentEndMs) ||
+                       (caption.endMs > segmentStartMs && caption.endMs <= segmentEndMs) ||
+                       (caption.startMs < segmentStartMs && caption.endMs > segmentEndMs);
+              })
+              .map(caption => ({
+                text: caption.text,
+                startMs: Math.max(0, caption.startMs - segmentStartMs),
+                endMs: Math.min(segmentLength * 1000, caption.endMs - segmentStartMs),
+              }));
+            
+            // Find video for this segment (shorter duration)
+            let segmentVideoUrl: string;
+            let segmentIsImage = false;
+            if ('searchTerms' in scene) {
+              const video = await this.pexelsApi.findVideo(
+                scene.searchTerms,
+                segmentLength,
+                excludeVideoIds,
+                orientation,
+              );
+              excludeVideoIds.push(video.id);
+              segmentVideoUrl = video.url;
+            } else {
+              // Handle ken burst scene with image ID
+              const kenBurstScene = scene as KenBurstSceneInput;
+              segmentIsImage = true;
+              segmentVideoUrl = `http://localhost:${this.config.port}/api/images/${kenBurstScene.imageId}`;
+            }
+            
+            // Add padding only to the last segment of the last scene
+            const totalSegments = optimizedCutPoints.length - 1;
+            let finalSegmentLength = segmentLength;
+            if (index + 1 === inputScenes.length && segmentIndex + 1 === totalSegments && config.paddingBack) {
+              finalSegmentLength += config.paddingBack / 1000;
+            }
+            
+            scenes.push({
+              captions: segmentCaptions,
+              video: segmentVideoUrl,
+              isImage: segmentIsImage,
+              audio: {
+                url: `http://localhost:${this.config.port}/api/tmp/${segmentMp3FileName}`,
+                duration: finalSegmentLength,
+              },
+            });
+            
+            totalDuration += finalSegmentLength;
+          }
+          
+          // Skip the rest of the processing for this scene since we already processed all segments
+          index++;
+          continue;
+        }
+        
+        // Audio is short enough, process normally
+        audioLength = fullAudioDuration;
+        
+        // Normalize audio for Whisper
+        await this.ffmpeg.normalizeAudioFile(audioFilePath, tempWavPath);
+        
+        // Convert to MP3
+        await this.ffmpeg.convertAudioFileToMp3(audioFilePath, tempMp3Path);
+        
+        // Convert to ArrayBuffer for consistency
+        audioStream = await this.ffmpeg.convertAudioFileToArrayBuffer(audioFilePath);
+      } else if ('text' in scene && scene.text) {
+        // Generate audio using Kokoro (original flow)
+        const audio = await this.kokoro.generate(
+          scene.text,
+          config.voice ?? "af_heart",
+        );
+        audioLength = audio.audioLength;
+        audioStream = audio.audio;
+
+        await this.ffmpeg.saveNormalizedAudio(audioStream, tempWavPath);
+        await this.ffmpeg.saveToMp3(audioStream, tempMp3Path);
+      } else {
+        throw new Error("Scene must have either 'text' or 'audioId'");
+      }
+
+      // Generate captions using Whisper
+      const captions = await this.whisper.CreateCaption(tempWavPath);
 
       // add the paddingBack in seconds to the last scene
       if (index + 1 === inputScenes.length && config.paddingBack) {
         audioLength += config.paddingBack / 1000;
       }
-
-      const tempId = cuid();
-      const tempWavFileName = `${tempId}.wav`;
-      const tempMp3FileName = `${tempId}.mp3`;
-      const tempWavPath = path.join(this.config.tempDirPath, tempWavFileName);
-      const tempMp3Path = path.join(this.config.tempDirPath, tempMp3FileName);
-      tempFiles.push(tempWavPath, tempMp3Path);
-
-      await this.ffmpeg.saveNormalizedAudio(audioStream, tempWavPath);
-      const captions = await this.whisper.CreateCaption(tempWavPath);
-
-      await this.ffmpeg.saveToMp3(audioStream, tempMp3Path);
 
       let videoUrl: string;
       let isImage = false;
@@ -236,6 +439,86 @@ export class ShortCreator {
     const imagePath = path.join(this.config.imagesDirPath, imageFile);
     fs.removeSync(imagePath);
     logger.debug({ imageId }, "Deleted image file");
+  }
+
+  public deleteAudio(audioId: string): void {
+    const files = fs.readdirSync(this.config.audioDirPath);
+    const audioFile = files.find(file => file.startsWith(audioId));
+    
+    if (!audioFile) {
+      throw new Error(`Audio ${audioId} not found`);
+    }
+
+    const audioPath = path.join(this.config.audioDirPath, audioFile);
+    fs.removeSync(audioPath);
+    logger.debug({ audioId }, "Deleted audio file");
+  }
+
+  public listAllAudios(): { id: string; filename: string; status: ImageStatus }[] {
+    const audios: { id: string; filename: string; status: ImageStatus }[] = [];
+
+    // Check if audio directory exists
+    if (!fs.existsSync(this.config.audioDirPath)) {
+      return audios;
+    }
+
+    // Read all files in the audio directory
+    const files = fs.readdirSync(this.config.audioDirPath);
+
+    // Process each audio file
+    for (const file of files) {
+      const id = path.parse(file).name;
+      let status: ImageStatus = "ready";
+
+      // Check if audio is being used in any processing video
+      const isInQueue = this.queue.some(item => {
+        if ('audioId' in item.sceneInput[0]) {
+          return (item.sceneInput as SceneInput[]).some(
+            scene => 'audioId' in scene && scene.audioId === id
+          );
+        }
+        return false;
+      });
+
+      if (isInQueue) {
+        status = "processing";
+      }
+
+      audios.push({ id, filename: file, status });
+    }
+
+    // Add audios that are in the queue but not yet rendered
+    for (const queueItem of this.queue) {
+      if (Array.isArray(queueItem.sceneInput) && queueItem.sceneInput.length > 0) {
+        const scenes = queueItem.sceneInput as SceneInput[];
+        for (const scene of scenes) {
+          if ('audioId' in scene && scene.audioId) {
+            const existingAudio = audios.find(audio => audio.id === scene.audioId);
+            if (!existingAudio) {
+              audios.push({
+                id: scene.audioId,
+                filename: `${scene.audioId} (processing)`,
+                status: "processing"
+              });
+            }
+          }
+        }
+      }
+    }
+
+    return audios;
+  }
+
+  public getAudio(audioId: string): Buffer {
+    const files = fs.readdirSync(this.config.audioDirPath);
+    const audioFile = files.find(file => file.startsWith(audioId));
+
+    if (!audioFile) {
+      throw new Error(`Audio ${audioId} not found`);
+    }
+
+    const audioPath = path.join(this.config.audioDirPath, audioFile);
+    return fs.readFileSync(audioPath);
   }
 
   public getVideo(videoId: string): Buffer {

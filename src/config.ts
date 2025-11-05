@@ -33,6 +33,7 @@ export class Config {
   public packageDirPath: string;
   public musicDirPath: string;
   public imagesDirPath: string;
+  public audioDirPath: string;
   public pexelsApiKey: string;
   public logLevel: pino.Level;
   public whisperVerbose: boolean;
@@ -57,6 +58,7 @@ export class Config {
     this.videosDirPath = path.join(this.dataDirPath, "videos");
     this.tempDirPath = path.join(this.dataDirPath, "temp");
     this.imagesDirPath = path.join(this.dataDirPath, "images");
+    this.audioDirPath = path.join(this.dataDirPath, "audio");
     this.installationSuccessfulPath = path.join(
       this.dataDirPath,
       "installation-successful",
@@ -67,6 +69,7 @@ export class Config {
     fs.ensureDirSync(this.videosDirPath);
     fs.ensureDirSync(this.tempDirPath);
     fs.ensureDirSync(this.imagesDirPath);
+    fs.ensureDirSync(this.audioDirPath);
 
     this.packageDirPath = path.join(__dirname, "..");
     this.staticDirPath = path.join(this.packageDirPath, "static");

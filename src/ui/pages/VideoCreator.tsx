@@ -39,6 +39,8 @@ import SettingsIcon from "@mui/icons-material/Settings";
 import CheckCircleIcon from "@mui/icons-material/CheckCircle";
 import AutoAwesomeIcon from "@mui/icons-material/AutoAwesome";
 import ContentCopyIcon from "@mui/icons-material/ContentCopy";
+import AudioFileIcon from "@mui/icons-material/AudioFile";
+import RecordVoiceOverIcon from "@mui/icons-material/RecordVoiceOver";
 import Tabs from "@mui/material/Tabs";
 import Tab from "@mui/material/Tab";
 import {
@@ -57,9 +59,17 @@ interface SceneFormData {
   searchTerms: string;
   imageId?: string;
   imageUrl?: string;
+  audioId?: string;
+  audioUrl?: string;
+  audioMode?: "text" | "audio"; // "text" para texto, "audio" para audio subido
 }
 
 interface ImageData {
+  id: string;
+  filename: string;
+}
+
+interface AudioData {
   id: string;
   filename: string;
 }
@@ -83,6 +93,20 @@ const uploadImage = async (file: File): Promise<{ imageId: string }> => {
   const formData = new FormData();
   formData.append("image", file);
   const response = await axios.post("/api/images", formData, {
+    headers: { "Content-Type": "multipart/form-data" },
+  });
+  return response.data;
+};
+
+const fetchAudios = async (): Promise<AudioData[]> => {
+  const response = await axios.get("/api/audio");
+  return response.data.audios || [];
+};
+
+const uploadAudio = async (file: File): Promise<{ audioId: string }> => {
+  const formData = new FormData();
+  formData.append("audio", file);
+  const response = await axios.post("/api/audio", formData, {
     headers: { "Content-Type": "multipart/form-data" },
   });
   return response.data;
@@ -131,7 +155,7 @@ const VideoCreator: React.FC = () => {
   const [activeStep, setActiveStep] = useState(0);
   const [videoType, setVideoType] = useState<"regular" | "ken-burst">("regular");
   const [scenes, setScenes] = useState<SceneFormData[]>([
-    { text: "", searchTerms: "" },
+    { text: "", searchTerms: "", audioMode: "text" },
   ]);
   const [fullText, setFullText] = useState<string>("");
   const [globalKeywords, setGlobalKeywords] = useState<string>("");
@@ -161,10 +185,22 @@ const VideoCreator: React.FC = () => {
     queryFn: fetchImages,
   });
 
+  const { data: availableAudios = [], refetch: refetchAudios } = useQuery({
+    queryKey: ["audios"],
+    queryFn: fetchAudios,
+  });
+
   const uploadImageMutation = useMutation({
     mutationFn: uploadImage,
     onSuccess: () => {
       refetchImages();
+    },
+  });
+
+  const uploadAudioMutation = useMutation({
+    mutationFn: uploadAudio,
+    onSuccess: () => {
+      refetchAudios();
     },
   });
 
@@ -213,6 +249,7 @@ const VideoCreator: React.FC = () => {
       return {
         text: text.trim(),
         searchTerms: searchTerms,
+        audioMode: "text" as const,
       };
     });
     
@@ -228,7 +265,7 @@ const VideoCreator: React.FC = () => {
   }, []);
 
   const handleAddScene = useCallback(() => {
-    setScenes([...scenes, { text: "", searchTerms: "" }]);
+    setScenes([...scenes, { text: "", searchTerms: "", audioMode: "text" }]);
   }, [scenes]);
 
   const handleRemoveScene = useCallback((index: number) => {
@@ -268,9 +305,31 @@ const VideoCreator: React.FC = () => {
     }
   }, [scenes, uploadImageMutation]);
 
+  const handleAudioUpload = useCallback(async (index: number, file: File) => {
+    try {
+      const result = await uploadAudioMutation.mutateAsync(file);
+      const newScenes = [...scenes];
+      newScenes[index] = {
+        ...newScenes[index],
+        audioId: result.audioId,
+        audioUrl: `/api/audio/${result.audioId}`,
+        audioMode: "audio" as const,
+      };
+      setScenes(newScenes);
+    } catch (err) {
+      console.error("Failed to upload audio:", err);
+    }
+  }, [scenes, uploadAudioMutation]);
+
   const validateScenes = useMemo(() => {
     return scenes.every((scene) => {
-      if (!scene.text.trim()) return false;
+      // Validar que tenga texto o audio según el modo
+      if (scene.audioMode === "audio") {
+        if (!scene.audioId) return false;
+      } else {
+        if (!scene.text.trim()) return false;
+      }
+      
       if (videoType === "regular") {
         return scene.searchTerms.trim().length > 0;
       } else {
@@ -298,13 +357,23 @@ const VideoCreator: React.FC = () => {
 
     try {
       if (videoType === "regular") {
-        const apiScenes: SceneInput[] = scenes.map((scene) => ({
-          text: scene.text,
-          searchTerms: scene.searchTerms
-            .split(",")
-            .map((term) => term.trim())
-            .filter((term) => term.length > 0),
-        }));
+        const apiScenes: SceneInput[] = scenes.map((scene) => {
+          const baseScene: any = {
+            searchTerms: scene.searchTerms
+              .split(",")
+              .map((term) => term.trim())
+              .filter((term) => term.length > 0),
+          };
+          
+          // Si tiene audioId, usar audio, sino usar text
+          if (scene.audioMode === "audio" && scene.audioId) {
+            baseScene.audioId = scene.audioId;
+          } else {
+            baseScene.text = scene.text;
+          }
+          
+          return baseScene;
+        });
 
         createVideoMutation.mutate({
           scenes: apiScenes,
@@ -612,19 +681,103 @@ const VideoCreator: React.FC = () => {
 
                     <Grid container spacing={3}>
                       <Grid item xs={12}>
-                        <TextField
-                          fullWidth
-                          label="Text (Narration)"
-                          multiline
-                          rows={4}
-                          value={scene.text}
-                          onChange={(e) =>
-                            handleSceneChange(index, "text", e.target.value)
-                          }
-                          required
-                          helperText="The text that will be converted to speech"
-                          error={!scene.text.trim()}
-                        />
+                        <Box mb={2}>
+                          <ToggleButtonGroup
+                            value={scene.audioMode || "text"}
+                            exclusive
+                            onChange={(_, value) => {
+                              if (value !== null) {
+                                const newScenes = [...scenes];
+                                newScenes[index] = {
+                                  ...newScenes[index],
+                                  audioMode: value,
+                                  text: value === "text" ? newScenes[index].text : "",
+                                  audioId: value === "audio" ? newScenes[index].audioId : undefined,
+                                  audioUrl: value === "audio" ? newScenes[index].audioUrl : undefined,
+                                };
+                                setScenes(newScenes);
+                              }
+                            }}
+                            aria-label="audio mode"
+                            size="small"
+                            sx={{ mb: 2 }}
+                          >
+                            <ToggleButton value="text" aria-label="text mode">
+                              <RecordVoiceOverIcon sx={{ mr: 1 }} />
+                              Texto (Kokoro)
+                            </ToggleButton>
+                            <ToggleButton value="audio" aria-label="audio mode">
+                              <AudioFileIcon sx={{ mr: 1 }} />
+                              Audio Subido
+                            </ToggleButton>
+                          </ToggleButtonGroup>
+                        </Box>
+
+                        {(scene.audioMode || "text") === "text" ? (
+                          <TextField
+                            fullWidth
+                            label="Text (Narration)"
+                            multiline
+                            rows={4}
+                            value={scene.text}
+                            onChange={(e) =>
+                              handleSceneChange(index, "text", e.target.value)
+                            }
+                            required
+                            helperText="The text that will be converted to speech using Kokoro"
+                            error={!scene.text.trim()}
+                          />
+                        ) : (
+                          <Box>
+                            <input
+                              accept="audio/*"
+                              style={{ display: "none" }}
+                              id={`audio-upload-${index}`}
+                              type="file"
+                              onChange={(e) => {
+                                const file = e.target.files?.[0];
+                                if (file) {
+                                  handleAudioUpload(index, file);
+                                }
+                              }}
+                            />
+                            <label htmlFor={`audio-upload-${index}`}>
+                              <Button
+                                variant="outlined"
+                                component="span"
+                                startIcon={
+                                  uploadAudioMutation.isPending ? (
+                                    <CircularProgress size={20} />
+                                  ) : (
+                                    <CloudUploadIcon />
+                                  )
+                                }
+                                disabled={uploadAudioMutation.isPending}
+                                sx={{ mb: 2 }}
+                                fullWidth
+                              >
+                                {scene.audioUrl
+                                  ? "Cambiar Audio"
+                                  : "Subir Audio"}
+                              </Button>
+                            </label>
+                            {scene.audioUrl && (
+                              <Fade in>
+                                <Box sx={{ mt: 2 }}>
+                                  <Alert severity="success" sx={{ mb: 2 }}>
+                                    Audio subido correctamente: {availableAudios.find(a => a.id === scene.audioId)?.filename || scene.audioId}
+                                  </Alert>
+                                  <audio controls src={scene.audioUrl} style={{ width: "100%" }} />
+                                </Box>
+                              </Fade>
+                            )}
+                            {!scene.audioUrl && (
+                              <FormHelperText>
+                                Sube un archivo de audio (MP3, WAV, M4A, OGG, WEBM) para usar tu propia voz en lugar de generar texto con Kokoro
+                              </FormHelperText>
+                            )}
+                          </Box>
+                        )}
                       </Grid>
 
                       {videoType === "regular" ? (
