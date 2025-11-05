@@ -45,6 +45,37 @@ export class Remotion {
     }
   }
 
+  private getOptimizedConcurrency(): number {
+    // Si está configurado explícitamente, respetarlo (prioridad a variables de entorno)
+    if (this.config.concurrency !== undefined) {
+      return this.config.concurrency;
+    }
+    
+    // En Docker o con recursos limitados, ser conservador para evitar OOM
+    if (this.config.runningInDocker) {
+      return 1; // Valor seguro para Docker según README
+    }
+    
+    // Fuera de Docker, usar más cores pero de forma conservadora
+    // Máximo 4 para evitar OOM, incluso en sistemas con muchos cores
+    return Math.min(4, Math.max(1, Math.floor(os.cpus().length / 2)));
+  }
+
+  private getOptimizedCacheSize(): number | null {
+    // Si está configurado explícitamente, respetarlo (prioridad a variables de entorno)
+    if (this.config.videoCacheSizeInBytes !== null) {
+      return this.config.videoCacheSizeInBytes;
+    }
+    
+    // En Docker, usar valores conservadores para evitar OOM (según README)
+    if (this.config.runningInDocker) {
+      return 100 * 1024 * 1024; // 100MB - valor seguro para Docker
+    }
+    
+    // Fuera de Docker, podemos ser un poco más agresivos pero aún conservadores
+    return 200 * 1024 * 1024; // 200MB
+  }
+
   private async renderWithRetry(
     composition: any,
     outputLocation: string,
@@ -60,13 +91,13 @@ export class Remotion {
         outputLocation,
         inputProps: data,
         onProgress,
-        // Optimización de concurrencia: usar más cores si están disponibles
-        concurrency: this.config.concurrency ?? Math.max(1, Math.floor(os.cpus().length / 2)),
-        // Cache de video: aumentar si hay memoria disponible
-        offthreadVideoCacheSizeInBytes: this.config.videoCacheSizeInBytes ?? 200 * 1024 * 1024, // 200MB por defecto
-        // Timeout más alto para videos largos
+        // Concurrencia: respeta CONCURRENCY si está definida, sino usa valores seguros
+        concurrency: this.getOptimizedConcurrency(),
+        // Cache de video: respeta VIDEO_CACHE_SIZE_IN_BYTES si está definida, sino usa valores seguros
+        offthreadVideoCacheSizeInBytes: this.getOptimizedCacheSize(),
+        // Timeout más alto para videos largos (no causa problemas de memoria)
         timeoutInMilliseconds: 60000,
-        // Aceleración por hardware (si está disponible)
+        // Aceleración por hardware (si está disponible, no causa problemas de memoria)
         hardwareAcceleration: "if-possible",
       });
     } catch (error) {
@@ -155,13 +186,13 @@ export class Remotion {
         serveUrl: this.bundled,
         outputLocation,
         onProgress: onProgressCallback,
-        // Optimización de concurrencia: usar más cores si están disponibles
-        concurrency: this.config.concurrency ?? Math.max(1, Math.floor(os.cpus().length / 2)),
-        // Cache de video: aumentar si hay memoria disponible
-        offthreadVideoCacheSizeInBytes: this.config.videoCacheSizeInBytes ?? 200 * 1024 * 1024, // 200MB por defecto
-        // Timeout más alto para videos largos
+        // Concurrencia: respeta CONCURRENCY si está definida, sino usa valores seguros
+        concurrency: this.getOptimizedConcurrency(),
+        // Cache de video: respeta VIDEO_CACHE_SIZE_IN_BYTES si está definida, sino usa valores seguros
+        offthreadVideoCacheSizeInBytes: this.getOptimizedCacheSize(),
+        // Timeout más alto para videos largos (no causa problemas de memoria)
         timeoutInMilliseconds: 60000,
-        // Aceleración por hardware (si está disponible)
+        // Aceleración por hardware (si está disponible, no causa problemas de memoria)
         hardwareAcceleration: "if-possible",
       });
       logger.debug({ outputLocation }, "Test video rendered successfully");
