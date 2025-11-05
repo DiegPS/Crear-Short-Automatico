@@ -2,6 +2,7 @@ import z from "zod";
 import { bundle } from "@remotion/bundler";
 import { renderMedia, selectComposition, RenderMediaOnProgress } from "@remotion/renderer";
 import path from "path";
+import os from "os";
 import { ensureBrowser } from "@remotion/renderer";
 
 import { Config } from "../../config";
@@ -33,6 +34,8 @@ export class Remotion {
           "root",
           `index.${config.devMode ? "ts" : "js"}`,
         ),
+        // Cache del bundle para evitar re-bundling innecesario
+        publicDir: path.join(config.packageDirPath, "static"),
       });
       logger.debug("Remotion bundle created successfully");
       return new Remotion(bundled, config);
@@ -57,9 +60,14 @@ export class Remotion {
         outputLocation,
         inputProps: data,
         onProgress,
-        concurrency: this.config.concurrency ?? 1,
-        offthreadVideoCacheSizeInBytes: this.config.videoCacheSizeInBytes,
-        timeoutInMilliseconds: 30000,
+        // Optimización de concurrencia: usar más cores si están disponibles
+        concurrency: this.config.concurrency ?? Math.max(1, Math.floor(os.cpus().length / 2)),
+        // Cache de video: aumentar si hay memoria disponible
+        offthreadVideoCacheSizeInBytes: this.config.videoCacheSizeInBytes ?? 200 * 1024 * 1024, // 200MB por defecto
+        // Timeout más alto para videos largos
+        timeoutInMilliseconds: 60000,
+        // Aceleración por hardware (si está disponible)
+        hardwareAcceleration: "if-possible",
       });
     } catch (error) {
       if (retryCount < MAX_RETRIES) {
@@ -147,9 +155,14 @@ export class Remotion {
         serveUrl: this.bundled,
         outputLocation,
         onProgress: onProgressCallback,
-        concurrency: this.config.concurrency ?? 1,
-        offthreadVideoCacheSizeInBytes: this.config.videoCacheSizeInBytes,
-        timeoutInMilliseconds: 30000,
+        // Optimización de concurrencia: usar más cores si están disponibles
+        concurrency: this.config.concurrency ?? Math.max(1, Math.floor(os.cpus().length / 2)),
+        // Cache de video: aumentar si hay memoria disponible
+        offthreadVideoCacheSizeInBytes: this.config.videoCacheSizeInBytes ?? 200 * 1024 * 1024, // 200MB por defecto
+        // Timeout más alto para videos largos
+        timeoutInMilliseconds: 60000,
+        // Aceleración por hardware (si está disponible)
+        hardwareAcceleration: "if-possible",
       });
       logger.debug({ outputLocation }, "Test video rendered successfully");
     } catch (error) {
