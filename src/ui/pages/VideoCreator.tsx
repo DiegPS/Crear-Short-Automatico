@@ -139,7 +139,7 @@ const VideoCreator: React.FC = () => {
   const [config, setConfig] = useState<RenderConfig>({
     paddingBack: 1500,
     music: MusicMoodEnum.chill,
-    captionPosition: CaptionPositionEnum.bottom,
+    captionPosition: CaptionPositionEnum.center,
     captionBackgroundColor: "#3b82f6",
     voice: VoiceEnum.af_heart,
     orientation: OrientationEnum.portrait,
