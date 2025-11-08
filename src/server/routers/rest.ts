@@ -91,6 +91,7 @@ export class APIRouter {
           const videoId = this.shortCreator.addToQueue(
             input.scenes,
             input.config,
+            input.title,
           );
 
           res.status(201).json({
@@ -159,7 +160,26 @@ export class APIRouter {
     this.router.get(
       "/short-videos",
       (req: ExpressRequest, res: ExpressResponse) => {
-        const videos = this.shortCreator.listAllVideos();
+        const searchTerm = req.query.search as string | undefined;
+        let videos;
+        
+        if (searchTerm && searchTerm.trim()) {
+          // Buscar por título en la base de datos
+          videos = this.database.searchVideosByTitle(searchTerm.trim());
+          // Actualizar estados de videos en cola
+          const queueVideos = this.shortCreator.listAllVideos();
+          const queueMap = new Map(queueVideos.map(v => [v.id, v]));
+          videos = videos.map(v => {
+            const queueVideo = queueMap.get(v.id);
+            if (queueVideo && queueVideo.status === "processing") {
+              return { ...v, status: "processing" as const };
+            }
+            return v;
+          });
+        } else {
+          videos = this.shortCreator.listAllVideos();
+        }
+        
         res.status(200).json({
           videos,
         });
@@ -424,6 +444,7 @@ export class APIRouter {
           const videoId = this.shortCreator.addKenBurstToQueue(
             input.scenes,
             input.config,
+            input.title,
           );
 
           res.status(201).json({

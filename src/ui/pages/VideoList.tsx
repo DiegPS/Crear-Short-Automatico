@@ -16,6 +16,8 @@ import {
   IconButton,
   Skeleton,
   Fade,
+  TextField,
+  InputAdornment,
 } from '@mui/material';
 import AddIcon from '@mui/icons-material/Add';
 import PlayArrowIcon from '@mui/icons-material/PlayArrow';
@@ -24,14 +26,17 @@ import VideoLibraryIcon from '@mui/icons-material/VideoLibrary';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import HourglassEmptyIcon from '@mui/icons-material/HourglassEmpty';
 import ErrorIcon from '@mui/icons-material/Error';
+import SearchIcon from '@mui/icons-material/Search';
 
 interface VideoItem {
   id: string;
+  title?: string;
   status: string;
 }
 
-const fetchVideos = async (): Promise<VideoItem[]> => {
-  const response = await axios.get('/api/short-videos');
+const fetchVideos = async (searchTerm?: string): Promise<VideoItem[]> => {
+  const params = searchTerm ? { search: searchTerm } : {};
+  const response = await axios.get('/api/short-videos', { params });
   return response.data.videos || [];
 };
 
@@ -42,10 +47,11 @@ const deleteVideo = async (id: string): Promise<void> => {
 const VideoList: React.FC = () => {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
+  const [searchTerm, setSearchTerm] = React.useState<string>('');
 
   const { data: videos = [], isLoading, error, refetch } = useQuery({
-    queryKey: ['videos'],
-    queryFn: fetchVideos,
+    queryKey: ['videos', searchTerm],
+    queryFn: () => fetchVideos(searchTerm || undefined),
     refetchInterval: 5000, // Refetch every 5 seconds to check for status updates
   });
 
@@ -178,6 +184,21 @@ const VideoList: React.FC = () => {
           Crear Nuevo Video
         </Button>
       </Box>
+
+      <TextField
+        fullWidth
+        placeholder="Buscar por título..."
+        value={searchTerm}
+        onChange={(e) => setSearchTerm(e.target.value)}
+        sx={{ mb: 3 }}
+        InputProps={{
+          startAdornment: (
+            <InputAdornment position="start">
+              <SearchIcon />
+            </InputAdornment>
+          ),
+        }}
+      />
       
       {videos.length === 0 ? (
         <Fade in>
@@ -253,8 +274,22 @@ const VideoList: React.FC = () => {
                               wordBreak: 'break-word',
                             }}
                           >
-                            Video {videoId.substring(0, 12)}...
+                            {video.title || `Video ${videoId.substring(0, 12)}...`}
                           </Typography>
+                          {video.title && (
+                            <Typography 
+                              variant="caption" 
+                              color="text.secondary"
+                              sx={{ 
+                                fontFamily: 'monospace',
+                                fontSize: '0.7rem',
+                                display: 'block',
+                                mt: 0.5,
+                              }}
+                            >
+                              ID: {videoId}
+                            </Typography>
+                          )}
                         </Box>
                         <Chip
                           icon={statusConfig.icon}
@@ -265,16 +300,18 @@ const VideoList: React.FC = () => {
                         />
                       </Box>
                       
-                      <Typography 
-                        variant="body2" 
-                        color="text.secondary"
-                        sx={{ 
-                          fontFamily: 'monospace',
-                          fontSize: '0.75rem',
-                        }}
-                      >
-                        ID: {videoId}
-                      </Typography>
+                      {!video.title && (
+                        <Typography 
+                          variant="body2" 
+                          color="text.secondary"
+                          sx={{ 
+                            fontFamily: 'monospace',
+                            fontSize: '0.75rem',
+                          }}
+                        >
+                          ID: {videoId}
+                        </Typography>
+                      )}
                     </CardContent>
                     
                     <CardActions sx={{ justifyContent: 'space-between', px: 2, pb: 2 }}>

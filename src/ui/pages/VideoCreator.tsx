@@ -156,6 +156,7 @@ const VideoCreator: React.FC = () => {
   const navigate = useNavigate();
   const [activeStep, setActiveStep] = useState(0);
   const [videoType, setVideoType] = useState<"regular" | "ken-burst">("regular");
+  const [videoTitle, setVideoTitle] = useState<string>("");
   const [scenes, setScenes] = useState<SceneFormData[]>([
     { text: "", searchTerms: "", audioMode: "text" },
   ]);
@@ -391,6 +392,7 @@ const VideoCreator: React.FC = () => {
         createVideoMutation.mutate({
           scenes: apiScenes,
           config,
+          title: videoTitle.trim() || undefined,
         });
       } else {
         const apiScenes: KenBurstSceneInput[] = scenes.map((scene) => ({
@@ -401,6 +403,7 @@ const VideoCreator: React.FC = () => {
         createVideoMutation.mutate({
           scenes: apiScenes,
           config,
+          title: videoTitle.trim() || undefined,
         });
       }
     } catch (err) {
@@ -496,6 +499,16 @@ const VideoCreator: React.FC = () => {
                     />
                   </Box>
                 </Box>
+
+                <TextField
+                  fullWidth
+                  label="Título del Video (Opcional)"
+                  value={videoTitle}
+                  onChange={(e) => setVideoTitle(e.target.value)}
+                  placeholder="Ej: Mi Video de Marketing"
+                  helperText="Un título opcional para identificar y buscar el video más fácilmente"
+                  sx={{ mb: 3 }}
+                />
 
                 <Tabs 
                   value={sceneMode} 

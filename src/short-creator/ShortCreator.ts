@@ -13,6 +13,7 @@ import { Config } from "../config";
 import { logger } from "../logger";
 import { MusicManager } from "./music";
 import { type Music } from "../types/shorts";
+import { DatabaseManager } from "../database/database";
 import type {
   SceneInput,
   RenderConfig,
@@ -31,6 +32,7 @@ export class ShortCreator {
     sceneInput: SceneInput[] | KenBurstSceneInput[];
     config: RenderConfig;
     id: string;
+    title?: string;
   }[] = [];
   private progressMap: Map<string, number> = new Map();
   constructor(
@@ -41,33 +43,56 @@ export class ShortCreator {
     private ffmpeg: FFMpeg,
     private pexelsApi: PexelsAPI,
     private musicManager: MusicManager,
+    private database: DatabaseManager,
   ) {}
 
   public status(id: string): VideoStatus | { status: VideoStatus; progress?: number } {
-    const videoPath = this.getVideoPath(id);
+    // Primero verificar en la cola (memoria)
     const isInQueue = this.queue.find((item) => item.id === id);
     const progress = this.progressMap.get(id);
     
     if (isInQueue) {
       return { status: "processing", progress };
     }
+    
+    // Luego verificar en la base de datos
+    const dbVideo = this.database.getVideo(id);
+    if (dbVideo) {
+      // Si está en DB pero no en cola, usar el estado de la DB
+      if (dbVideo.status === "processing" && progress !== undefined) {
+        return { status: dbVideo.status, progress };
+      }
+      return dbVideo.status === "processing" 
+        ? { status: dbVideo.status, progress: dbVideo.progress } 
+        : dbVideo.status;
+    }
+    
+    // Si no está en DB ni en cola, verificar si existe el archivo (fallback)
+    const videoPath = this.getVideoPath(id);
     if (fs.existsSync(videoPath)) {
-      // Clean up progress when video is ready
+      // Video existe pero no está en DB, agregarlo
+      this.database.insertVideo(id, "ready", 100);
       this.progressMap.delete(id);
       return "ready";
     }
+    
     // Clean up progress when video failed
     this.progressMap.delete(id);
     return "failed";
   }
 
-  public addToQueue(sceneInput: SceneInput[], config: RenderConfig): string {
+  public addToQueue(sceneInput: SceneInput[], config: RenderConfig, title?: string): string {
     // todo add mutex lock
     const id = cuid();
+    
+    // Guardar en la base de datos
+    this.database.insertVideo(id, "processing", 0, title);
+    
     this.queue.push({
       sceneInput,
       config,
       id,
+      title,
     });
     if (this.queue.length === 1) {
       this.processQueue();
@@ -88,8 +113,12 @@ export class ShortCreator {
     try {
       await this.createShort(id, sceneInput, config);
       logger.debug({ id }, "Video created successfully");
+      // Actualizar estado en DB a "ready"
+      this.database.updateVideoStatus(id, "ready", 100);
     } catch (error: unknown) {
       logger.error(error, "Error creating video");
+      // Actualizar estado en DB a "failed"
+      this.database.updateVideoStatus(id, "failed");
     } finally {
       this.queue.shift();
       this.processQueue();
@@ -403,8 +432,10 @@ export class ShortCreator {
       videoId,
       orientation,
       (progress) => {
-        // Update progress in the map
-        this.progressMap.set(videoId, Math.floor(progress * 100));
+        // Update progress in the map and database
+        const progressPercent = Math.floor(progress * 100);
+        this.progressMap.set(videoId, progressPercent);
+        this.database.updateVideoStatus(videoId, "processing", progressPercent);
       },
     );
 
@@ -424,8 +455,14 @@ export class ShortCreator {
 
   public deleteVideo(videoId: string): void {
     const videoPath = this.getVideoPath(videoId);
-    fs.removeSync(videoPath);
-    logger.debug({ videoId }, "Deleted video file");
+    // Eliminar archivo si existe
+    if (fs.existsSync(videoPath)) {
+      fs.removeSync(videoPath);
+      logger.debug({ videoId }, "Deleted video file");
+    }
+    // Eliminar de la base de datos
+    this.database.deleteVideo(videoId);
+    logger.debug({ videoId }, "Deleted video from database");
   }
 
   public deleteImage(imageId: string): void {
@@ -547,41 +584,39 @@ export class ShortCreator {
     return Array.from(tags.values());
   }
 
-  public listAllVideos(): { id: string; status: VideoStatus }[] {
-    const videos: { id: string; status: VideoStatus }[] = [];
-
-    // Check if videos directory exists
-    if (!fs.existsSync(this.config.videosDirPath)) {
-      return videos;
+  public listAllVideos(): { id: string; title?: string; status: VideoStatus }[] {
+    // Obtener todos los videos de la base de datos
+    const dbVideos = this.database.getAllVideos();
+    
+    // Crear un mapa para actualizar estados de videos en cola
+    const videosMap = new Map<string, { id: string; title?: string; status: VideoStatus }>();
+    
+    // Agregar videos de la DB
+    for (const dbVideo of dbVideos) {
+      videosMap.set(dbVideo.id, {
+        id: dbVideo.id,
+        title: dbVideo.title,
+        status: dbVideo.status,
+      });
     }
-
-    // Read all files in the videos directory
-    const files = fs.readdirSync(this.config.videosDirPath);
-
-    // Filter for MP4 files and extract video IDs
-    for (const file of files) {
-      if (file.endsWith(".mp4")) {
-        const videoId = file.replace(".mp4", "");
-
-        let status: VideoStatus = "ready";
-        const inQueue = this.queue.find((item) => item.id === videoId);
-        if (inQueue) {
-          status = "processing";
-        }
-
-        videos.push({ id: videoId, status });
-      }
-    }
-
-    // Add videos that are in the queue but not yet rendered
+    
+    // Actualizar estados de videos que están en la cola (processing)
     for (const queueItem of this.queue) {
-      const existingVideo = videos.find((v) => v.id === queueItem.id);
-      if (!existingVideo) {
-        videos.push({ id: queueItem.id, status: "processing" });
+      const existing = videosMap.get(queueItem.id);
+      if (existing) {
+        existing.status = "processing";
+      } else {
+        // Video en cola pero no en DB (no debería pasar, pero por seguridad)
+        videosMap.set(queueItem.id, {
+          id: queueItem.id,
+          title: queueItem.title,
+          status: "processing",
+        });
       }
     }
-
-    return videos;
+    
+    // Convertir mapa a array y ordenar por fecha (más recientes primero)
+    return Array.from(videosMap.values());
   }
 
   public listAllImages(): { id: string; filename: string; status: ImageStatus }[] {
@@ -645,13 +680,19 @@ export class ShortCreator {
   public addKenBurstToQueue(
     scenes: KenBurstSceneInput[],
     config: RenderConfig,
+    title?: string,
   ): string {
     // todo add mutex lock
     const id = cuid();
+    
+    // Guardar en la base de datos
+    this.database.insertVideo(id, "processing", 0, title);
+    
     this.queue.push({
       sceneInput: scenes,
       config: config,
       id,
+      title,
     });
     if (this.queue.length === 1) {
       this.processQueue();

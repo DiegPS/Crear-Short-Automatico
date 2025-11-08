@@ -79,12 +79,20 @@ export class DatabaseManager {
     this.db!.run(`
       CREATE TABLE IF NOT EXISTS videos (
         id TEXT PRIMARY KEY,
+        title TEXT,
         status TEXT NOT NULL CHECK(status IN ('processing', 'ready', 'failed')),
         progress INTEGER DEFAULT 0,
         created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
         updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
       )
     `);
+    
+    // Migración: agregar columna title si no existe (para bases de datos existentes)
+    try {
+      this.db!.run(`ALTER TABLE videos ADD COLUMN title TEXT`);
+    } catch (e) {
+      // La columna ya existe, ignorar error
+    }
 
     // Tabla de imágenes
     this.db!.run(`
@@ -115,6 +123,7 @@ export class DatabaseManager {
     this.db!.run(`CREATE INDEX IF NOT EXISTS idx_videos_created_at ON videos(created_at)`);
     this.db!.run(`CREATE INDEX IF NOT EXISTS idx_images_created_at ON images(created_at)`);
     this.db!.run(`CREATE INDEX IF NOT EXISTS idx_audios_created_at ON audios(created_at)`);
+    this.db!.run(`CREATE INDEX IF NOT EXISTS idx_videos_title ON videos(title)`);
 
     // Guardar cambios
     this.save();
@@ -144,13 +153,13 @@ export class DatabaseManager {
   }
 
   // Métodos para videos
-  public insertVideo(id: string, status: VideoStatus = "processing", progress: number = 0): void {
+  public insertVideo(id: string, status: VideoStatus = "processing", progress: number = 0, title?: string): void {
     this.ensureDatabase();
     const stmt = this.db!.prepare(`
-      INSERT INTO videos (id, status, progress, created_at, updated_at)
-      VALUES (?, ?, ?, datetime('now'), datetime('now'))
+      INSERT INTO videos (id, title, status, progress, created_at, updated_at)
+      VALUES (?, ?, ?, ?, datetime('now'), datetime('now'))
     `);
-    stmt.run([id, status, progress]);
+    stmt.run([id, title || null, status, progress]);
     stmt.free();
     this.save();
   }
@@ -177,16 +186,17 @@ export class DatabaseManager {
     this.save();
   }
 
-  public getVideo(id: string): { id: string; status: VideoStatus; progress: number } | null {
+  public getVideo(id: string): { id: string; title?: string; status: VideoStatus; progress: number } | null {
     this.ensureDatabase();
-    const stmt = this.db!.prepare("SELECT id, status, progress FROM videos WHERE id = ?");
+    const stmt = this.db!.prepare("SELECT id, title, status, progress FROM videos WHERE id = ?");
     stmt.bind([id]);
     
     if (stmt.step()) {
-      const result = stmt.getAsObject() as { id: string; status: VideoStatus; progress: number };
+      const result = stmt.getAsObject() as { id: string; title?: string; status: VideoStatus; progress: number };
       stmt.free();
       return {
         id: result.id,
+        title: result.title || undefined,
         status: result.status,
         progress: result.progress || 0,
       };
@@ -196,14 +206,42 @@ export class DatabaseManager {
     return null;
   }
 
-  public getAllVideos(): { id: string; status: VideoStatus }[] {
+  public getAllVideos(): { id: string; title?: string; status: VideoStatus }[] {
     this.ensureDatabase();
-    const stmt = this.db!.prepare("SELECT id, status FROM videos ORDER BY created_at DESC");
-    const results: { id: string; status: VideoStatus }[] = [];
+    const stmt = this.db!.prepare("SELECT id, title, status FROM videos ORDER BY created_at DESC");
+    const results: { id: string; title?: string; status: VideoStatus }[] = [];
     
     while (stmt.step()) {
-      const row = stmt.getAsObject() as { id: string; status: VideoStatus };
-      results.push({ id: row.id, status: row.status });
+      const row = stmt.getAsObject() as { id: string; title?: string; status: VideoStatus };
+      results.push({ 
+        id: row.id, 
+        title: row.title || undefined,
+        status: row.status 
+      });
+    }
+    
+    stmt.free();
+    return results;
+  }
+  
+  public searchVideosByTitle(searchTerm: string): { id: string; title?: string; status: VideoStatus }[] {
+    this.ensureDatabase();
+    const stmt = this.db!.prepare(`
+      SELECT id, title, status 
+      FROM videos 
+      WHERE title LIKE ? 
+      ORDER BY created_at DESC
+    `);
+    stmt.bind([`%${searchTerm}%`]);
+    const results: { id: string; title?: string; status: VideoStatus }[] = [];
+    
+    while (stmt.step()) {
+      const row = stmt.getAsObject() as { id: string; title?: string; status: VideoStatus };
+      results.push({ 
+        id: row.id, 
+        title: row.title || undefined,
+        status: row.status 
+      });
     }
     
     stmt.free();

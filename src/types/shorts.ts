@@ -153,6 +153,7 @@ export type CaptionPage = {
 export const createShortInput = z.object({
   scenes: z.array(sceneInput).describe("Each scene to be created"),
   config: renderConfig.describe("Configuration for rendering the video"),
+  title: z.string().optional().describe("Optional title for the video"),
 });
 export type CreateShortInput = z.infer<typeof createShortInput>;
 
@@ -196,6 +197,7 @@ export type KenBurstSceneInput = z.infer<typeof kenBurstSceneInput>;
 export const createKenBurstInput = z.object({
   scenes: z.array(kenBurstSceneInput).describe("Each scene to be created"),
   config: renderConfig.describe("Configuration for rendering the video"),
+  title: z.string().optional().describe("Optional title for the video"),
 });
 
 export type CreateKenBurstInput = z.infer<typeof createKenBurstInput>;

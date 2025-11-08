@@ -12,6 +12,7 @@ import { ShortCreator } from "./short-creator/ShortCreator";
 import { logger } from "./logger";
 import { Server } from "./server/server";
 import { MusicManager } from "./short-creator/music";
+import { DatabaseManager } from "./database/database";
 
 async function main() {
   const config = new Config();
@@ -42,6 +43,11 @@ async function main() {
   const pexelsApi = new PexelsAPI(config.pexelsApiKey);
 
   logger.debug("initializing the short creator");
+  
+  // Inicializar base de datos
+  const database = new DatabaseManager(config);
+  await database.ready();
+  
   const shortCreator = new ShortCreator(
     config,
     remotion,
@@ -50,6 +56,7 @@ async function main() {
     ffmpeg,
     pexelsApi,
     musicManager,
+    database,
   );
 
   if (!config.runningInDocker) {
