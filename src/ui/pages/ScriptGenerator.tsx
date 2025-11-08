@@ -36,6 +36,10 @@ const ScriptGenerator: React.FC = () => {
   const [editedScript, setEditedScript] = useState<string>("");
   const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [scripts, setScripts] = useState<string[]>([]);
+  const [scriptsWithScenes, setScriptsWithScenes] = useState<Array<{
+    script: string;
+    scenes: Array<{ text: string; searchTerms: string }>;
+  }>>([]);
   const [isGenerating, setIsGenerating] = useState(false);
   const [generationProgress, setGenerationProgress] = useState<{ current: number; total: number } | null>(null);
   const [generationError, setGenerationError] = useState<string | null>(null);
@@ -47,6 +51,7 @@ const ScriptGenerator: React.FC = () => {
 
     // Resetear estado
     setScripts([]);
+    setScriptsWithScenes([]);
     setGenerationError(null);
     setGenerationProgress(null);
     setIsGenerating(true);
@@ -112,12 +117,23 @@ const ScriptGenerator: React.FC = () => {
                     setGenerationProgress({ current: data.current, total: data.total });
                   } else if (currentEvent === "script" || data.script !== undefined) {
                     // Evento script
+                    const index = data.index !== undefined ? data.index : scripts.length;
                     setScripts((prev) => {
                       const newScripts = [...prev];
-                      const index = data.index !== undefined ? data.index : prev.length;
                       newScripts[index] = data.script;
                       return newScripts;
                     });
+                    // Guardar también con las escenas y tags
+                    if (data.scenes) {
+                      setScriptsWithScenes((prev) => {
+                        const newScriptsWithScenes = [...prev];
+                        newScriptsWithScenes[index] = {
+                          script: data.script,
+                          scenes: data.scenes,
+                        };
+                        return newScriptsWithScenes;
+                      });
+                    }
                   } else if (currentEvent === "error" || data.error) {
                     // Evento error
                     setGenerationError(data.error);
@@ -160,20 +176,35 @@ const ScriptGenerator: React.FC = () => {
       return;
     }
 
-    // Dividir el guion en escenas
-    const scenes = splitTextIntoScenes(editedScript);
+    // Buscar si tenemos las escenas con tags del guion seleccionado
+    const scriptIndex = scripts.indexOf(editedScript);
+    const scriptWithScenes = scriptIndex >= 0 ? scriptsWithScenes[scriptIndex] : null;
 
-    if (scenes.length === 0) {
-      alert("El guion no pudo ser dividido en escenas. Por favor, edítalo para que tenga múltiples oraciones separadas por puntos y saltos de línea.");
-      return;
+    let sceneData: Array<{ text: string; searchTerms: string; audioMode: "text" }>;
+
+    if (scriptWithScenes && scriptWithScenes.scenes.length > 0) {
+      // Usar las escenas generadas con sus tags
+      sceneData = scriptWithScenes.scenes.map((scene) => ({
+        text: scene.text.trim(),
+        searchTerms: scene.searchTerms || "",
+        audioMode: "text" as const,
+      }));
+    } else {
+      // Dividir el guion en escenas manualmente si no tenemos las escenas generadas
+      const scenes = splitTextIntoScenes(editedScript);
+
+      if (scenes.length === 0) {
+        alert("El guion no pudo ser dividido en escenas. Por favor, edítalo para que tenga múltiples oraciones separadas por puntos y saltos de línea.");
+        return;
+      }
+
+      // Preparar los datos para VideoCreator sin tags (se pueden agregar después)
+      sceneData = scenes.map((scene) => ({
+        text: scene.trim(),
+        searchTerms: "",
+        audioMode: "text" as const,
+      }));
     }
-
-    // Preparar los datos para VideoCreator
-    const sceneData = scenes.map((scene) => ({
-      text: scene.trim(),
-      searchTerms: "",
-      audioMode: "text" as const,
-    }));
 
     // Pasar a VideoCreator con los datos iniciales
     navigate("/create", {

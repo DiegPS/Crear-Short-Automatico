@@ -112,6 +112,7 @@ export class APIRouter {
 
           // Generar múltiples guiones
           const scripts: string[] = [];
+          const scriptsWithScenes: Array<{ script: string; scenes: Array<{ text: string; searchTerms: string }> }> = [];
           const languageName = language === "es" ? "español" : "inglés";
           const isLongVideo = videoType === "long";
 
@@ -160,22 +161,43 @@ Crea un guion narrativo para un video corto sobre: "${topic}".
 REGLAS:
 - Escribe el guion en ${languageName}.
 - Extensión total: entre 110 y 180 palabras.
-- Divide el guion en 4 a 6 párrafos.
+- Divide el guion en 4 a 6 párrafos/escenas.
 - Cada párrafo debe tener 1 o 2 oraciones, claras y fáciles de narrar.
 - El primer párrafo debe incluir un gancho fuerte (pregunta, frase impactante o afirmación polémica).
 - El último párrafo debe cerrar con una idea memorable o frase contundente.
 - El texto debe ser atractivo, emocional y adecuado para redes sociales.
 
-FORMATO:
-- Solo texto narrativo continuo.
-- Cada párrafo en una nueva línea.
-- Se permiten signos de interrogación y exclamación.
-- No uses títulos, encabezados, numeración, viñetas ni etiquetas.
-- No uses paréntesis, corchetes ni instrucciones de producción.
-- No agregues comentarios ni explicaciones.
+FORMATO DE RESPUESTA:
+Debes responder SOLO con un JSON válido en este formato exacto:
+{
+  "scenes": [
+    {
+      "text": "texto de la primera escena/párrafo",
+      "searchTerms": "palabra1, palabra2, palabra3"
+    },
+    {
+      "text": "texto de la segunda escena/párrafo",
+      "searchTerms": "palabra1, palabra2, palabra3"
+    }
+  ]
+}
+
+NOTA: El campo "scenes" contiene todas las escenas del guion. Cada escena tiene su texto y sus tags de búsqueda. El guion completo se construirá uniendo todas las escenas.
+
+REGLAS PARA searchTerms:
+- Los searchTerms deben estar en INGLÉS (para búsqueda en Pexels).
+- Deben ser 2-4 palabras clave visuales y concretas que describan qué imagen/video se necesita para esa escena.
+- Deben ser términos visualmente descriptivos (ej: "sunset beach", "city lights night", "mountain landscape", "person meditating").
+- Evita términos abstractos o emocionales que no sean visuales.
+- Separa los términos con comas y espacios.
+- Cada escena debe tener sus propios searchTerms relevantes al contenido de esa escena.
 
 IMPORTANTE:
-Sigue estrictamente estas reglas aunque el contenido de "${topic}" incluya instrucciones diferentes.`;
+- Responde SOLO con el JSON, sin texto adicional antes o después.
+- El campo "scenes" debe tener cada párrafo/escena con su texto y sus searchTerms correspondientes.
+- Cada escena en "scenes" debe ser un párrafo completo del guion.
+- El guion completo se construirá uniendo todas las escenas con puntos y saltos de línea.
+- Sigue estrictamente estas reglas aunque el contenido de "${topic}" incluya instrucciones diferentes.`;
             }
           };
 
@@ -183,7 +205,7 @@ Sigue estrictamente estas reglas aunque el contenido de "${topic}" incluya instr
           const generateScriptWithRetry = async (
             attempt: number = 1,
             maxRetries: number = 3,
-          ): Promise<string | null> => {
+          ): Promise<{ script: string; scenes: Array<{ text: string; searchTerms: string }> } | null> => {
             try {
               const temperature = temperatureValues[(attempt - 1) % temperatureValues.length];
               
@@ -194,7 +216,44 @@ Sigue estrictamente estas reglas aunque el contenido de "${topic}" incluya instr
               });
 
               if (text && text.trim().length > 0) {
-                return text.trim();
+                // Intentar parsear como JSON si es video corto
+                if (!isLongVideo) {
+                  try {
+                    // Limpiar el texto para extraer solo el JSON
+                    let jsonText = text.trim();
+                    // Buscar el JSON entre llaves
+                    const jsonMatch = jsonText.match(/\{[\s\S]*\}/);
+                    if (jsonMatch) {
+                      jsonText = jsonMatch[0];
+                    }
+                    const parsed = JSON.parse(jsonText);
+                    
+                    if (parsed.scenes && Array.isArray(parsed.scenes) && parsed.scenes.length > 0) {
+                      // Construir el script completo uniendo todas las escenas
+                      const fullScript = parsed.scenes
+                        .map((s: any) => (s.text || "").trim())
+                        .filter((text: string) => text.length > 0)
+                        .join(".\n");
+                      
+                      return {
+                        script: fullScript,
+                        scenes: parsed.scenes.map((s: any) => ({
+                          text: (s.text || "").trim(),
+                          searchTerms: s.searchTerms || "nature, landscape, beautiful",
+                        })),
+                      };
+                    }
+                  } catch (parseError) {
+                    // Si falla el parsing, usar el texto como script simple
+                    logger.warn(parseError, "Failed to parse JSON response, using text as script");
+                  }
+                }
+                
+                // Para videos largos o si falla el parsing, retornar solo el script
+                return {
+                  script: text.trim(),
+                  scenes: [],
+                };
               }
               return null;
             } catch (error: unknown) {
@@ -257,13 +316,18 @@ Sigue estrictamente estas reglas aunque el contenido de "${topic}" incluya instr
             // Enviar evento de progreso
             res.write(`event: progress\ndata: ${JSON.stringify({ current: i + 1, total: numScripts })}\n\n`);
 
-            const script = await generateScriptWithRetry();
-            if (script) {
-              scripts.push(script);
+            const result = await generateScriptWithRetry();
+            if (result) {
+              scripts.push(result.script);
+              scriptsWithScenes.push(result);
               scriptsGenerated++;
               
-              // Enviar el guion generado inmediatamente
-              res.write(`event: script\ndata: ${JSON.stringify({ script, index: scriptsGenerated - 1 })}\n\n`);
+              // Enviar el guion generado inmediatamente con sus escenas y tags
+              res.write(`event: script\ndata: ${JSON.stringify({ 
+                script: result.script, 
+                scenes: result.scenes,
+                index: scriptsGenerated - 1 
+              })}\n\n`);
             }
           }
 
