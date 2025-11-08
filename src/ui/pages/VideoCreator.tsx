@@ -42,6 +42,7 @@ import ContentCopyIcon from "@mui/icons-material/ContentCopy";
 import AudioFileIcon from "@mui/icons-material/AudioFile";
 import RecordVoiceOverIcon from "@mui/icons-material/RecordVoiceOver";
 import FolderOpenIcon from "@mui/icons-material/FolderOpen";
+import LanguageIcon from "@mui/icons-material/Language";
 import Tabs from "@mui/material/Tabs";
 import Tab from "@mui/material/Tab";
 import ImageSelectorDialog from "../components/ImageSelectorDialog";
@@ -1054,6 +1055,42 @@ const VideoCreator: React.FC = () => {
                       </Select>
                     </FormControl>
                   </Grid>
+
+                  <Grid item xs={12} sm={6}>
+                    <FormControl fullWidth>
+                      <InputLabel>Idioma para Subtítulos</InputLabel>
+                      <Select
+                        value={config.language || "auto"}
+                        onChange={(e) => {
+                          const value = e.target.value === "auto" ? undefined : e.target.value;
+                          handleConfigChange("language", value);
+                        }}
+                        label="Idioma para Subtítulos"
+                      >
+                        <MenuItem value="auto">
+                          <Box display="flex" alignItems="center" gap={1}>
+                            <LanguageIcon fontSize="small" />
+                            <span>Auto-detectar</span>
+                          </Box>
+                        </MenuItem>
+                        <MenuItem value="es">
+                          <Box display="flex" alignItems="center" gap={1}>
+                            <span>🇪🇸</span>
+                            <span>Español</span>
+                          </Box>
+                        </MenuItem>
+                        <MenuItem value="en">
+                          <Box display="flex" alignItems="center" gap={1}>
+                            <span>🇬🇧</span>
+                            <span>Inglés</span>
+                          </Box>
+                        </MenuItem>
+                      </Select>
+                      <FormHelperText>
+                        Selecciona el idioma para la transcripción. Auto-detectar identificará el idioma automáticamente.
+                      </FormHelperText>
+                    </FormControl>
+                  </Grid>
                 </Grid>
               </Paper>
             )}
@@ -1108,6 +1145,14 @@ const VideoCreator: React.FC = () => {
                     <Grid item xs={6} sm={4}>
                       <Typography variant="body2" color="text.secondary">Orientación</Typography>
                       <Typography variant="body1">{config.orientation}</Typography>
+                    </Grid>
+                    <Grid item xs={6} sm={4}>
+                      <Typography variant="body2" color="text.secondary">Idioma</Typography>
+                      <Typography variant="body1">
+                        {config.language === "es" ? "🇪🇸 Español" : 
+                         config.language === "en" ? "🇬🇧 Inglés" : 
+                         "🌐 Auto-detectar"}
+                      </Typography>
                     </Grid>
                   </Grid>
                 </Box>

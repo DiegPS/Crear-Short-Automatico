@@ -8,7 +8,9 @@ import { kokoroModelPrecision, whisperModels } from "./types/shorts";
 const defaultLogLevel: pino.Level = "info";
 const defaultPort = 3123;
 const whisperVersion = "1.7.1";
-const defaultWhisperModel: whisperModels = "base.en"; // possible options: "tiny", "tiny.en", "base", "base.en", "small", "small.en", "medium", "medium.en", "large-v1", "large-v2", "large-v3", "large-v3-turbo"
+const defaultWhisperModel: whisperModels = "base"; // possible options: "tiny", "tiny.en", "base", "base.en", "small", "small.en", "medium", "medium.en", "large-v1", "large-v2", "large-v3", "large-v3-turbo"
+// Nota: "base" es multilingüe (soporta español, inglés y otros idiomas)
+// Los modelos con ".en" (como "base.en") son solo para inglés pero pueden ser más precisos para ese idioma
 
 // Create the global logger
 export const logger = pino({
@@ -42,6 +44,7 @@ export class Config {
   public devMode: boolean;
   public whisperVersion: string = whisperVersion;
   public whisperModel: whisperModels = defaultWhisperModel;
+  public whisperLanguage: string | null = null; // null = auto-detect, "es" = español, "en" = inglés, etc.
   public kokoroModelPrecision: kokoroModelPrecision = "fp32";
 
   // docker-specific, performance-related settings to prevent memory issues
@@ -84,6 +87,9 @@ export class Config {
 
     if (process.env.WHISPER_MODEL) {
       this.whisperModel = process.env.WHISPER_MODEL as whisperModels;
+    }
+    if (process.env.WHISPER_LANGUAGE) {
+      this.whisperLanguage = process.env.WHISPER_LANGUAGE;
     }
     if (process.env.KOKORO_MODEL_PRECISION) {
       this.kokoroModelPrecision = process.env

@@ -190,7 +190,7 @@ export class ShortCreator {
           const fullTempWavPath = path.join(this.config.tempDirPath, `full_${tempId}.wav`);
           tempFiles.push(fullTempWavPath);
           await this.ffmpeg.normalizeAudioFile(audioFilePath, fullTempWavPath);
-          const fullCaptions = await this.whisper.CreateCaption(fullTempWavPath);
+          const fullCaptions = await this.whisper.CreateCaption(fullTempWavPath, config.language);
           
           // Find natural cut points (pauses between captions and sentence endings)
           const cutPoints: number[] = [0]; // Always start at 0
@@ -367,7 +367,7 @@ export class ShortCreator {
       }
 
       // Generate captions using Whisper
-      const captions = await this.whisper.CreateCaption(tempWavPath);
+      const captions = await this.whisper.CreateCaption(tempWavPath, config.language);
 
       // add the paddingBack in seconds to the last scene
       if (index + 1 === inputScenes.length && config.paddingBack) {
