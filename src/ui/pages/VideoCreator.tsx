@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useCallback, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import axios from "axios";
 import {
@@ -124,7 +124,7 @@ const createVideo = async (data: { scenes: SceneInput[] | KenBurstSceneInput[]; 
 const steps = ["Escenas", "Configuración", "Revisar"];
 
 // Función para dividir texto automáticamente en escenas
-const splitTextIntoScenes = (text: string): string[] => {
+export const splitTextIntoScenes = (text: string): string[] => {
   if (!text.trim()) return [];
   
   // Dividir por punto seguido de salto de línea (".\n" o ".\r\n")
@@ -155,16 +155,30 @@ const splitTextIntoScenes = (text: string): string[] => {
 
 const VideoCreator: React.FC = () => {
   const navigate = useNavigate();
+  const location = useLocation();
   const queryClient = useQueryClient();
-  const [activeStep, setActiveStep] = useState(0);
+  
+  // Obtener datos iniciales desde ScriptGenerator si existen
+  const initialState = location.state as {
+    initialScenes?: SceneFormData[];
+    initialTitle?: string;
+    initialLanguage?: string;
+    skipToConfig?: boolean;
+  } | null;
+
+  const [activeStep, setActiveStep] = useState(initialState?.skipToConfig ? 1 : 0);
   const [videoType, setVideoType] = useState<"regular" | "ken-burst">("regular");
-  const [videoTitle, setVideoTitle] = useState<string>("");
-  const [scenes, setScenes] = useState<SceneFormData[]>([
-    { text: "", searchTerms: "", audioMode: "text" },
-  ]);
+  const [videoTitle, setVideoTitle] = useState<string>(initialState?.initialTitle || "");
+  const [scenes, setScenes] = useState<SceneFormData[]>(
+    initialState?.initialScenes && initialState.initialScenes.length > 0
+      ? initialState.initialScenes
+      : [{ text: "", searchTerms: "", audioMode: "text" }]
+  );
   const [fullText, setFullText] = useState<string>("");
   const [globalKeywords, setGlobalKeywords] = useState<string>("");
-  const [sceneMode, setSceneMode] = useState<"auto" | "manual">("auto");
+  const [sceneMode, setSceneMode] = useState<"auto" | "manual">(
+    initialState?.initialScenes ? "manual" : "auto"
+  );
   const [imageSelectorOpen, setImageSelectorOpen] = useState<number | null>(null);
   const [config, setConfig] = useState<RenderConfig>({
     paddingBack: 1500,
@@ -174,7 +188,7 @@ const VideoCreator: React.FC = () => {
     voice: VoiceEnum.ef_dora, // Voz por defecto para español
     orientation: OrientationEnum.portrait,
     musicVolume: MusicVolumeEnum.high,
-    language: "es",
+    language: initialState?.initialLanguage || "es",
   });
 
   const { data: voices = [], isLoading: loadingVoices } = useQuery({

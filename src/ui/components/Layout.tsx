@@ -20,6 +20,7 @@ import AddIcon from '@mui/icons-material/Add';
 import ImageIcon from '@mui/icons-material/Image';
 import AudioFileIcon from '@mui/icons-material/AudioFile';
 import HomeIcon from '@mui/icons-material/Home';
+import AutoAwesomeIcon from '@mui/icons-material/AutoAwesome';
 
 interface LayoutProps {
   children: React.ReactNode;
@@ -216,6 +217,25 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
                 }}
               >
                 {!isMobile && 'Audios'}
+              </Button>
+              
+              <Button 
+                variant="outlined"
+                color="secondary"
+                startIcon={<AutoAwesomeIcon />}
+                onClick={() => navigate('/generate-script')}
+                sx={{
+                  ml: { xs: 0, sm: 1 },
+                  mr: { xs: 0, sm: 1 },
+                  borderColor: 'secondary.main',
+                  color: 'secondary.main',
+                  '&:hover': {
+                    borderColor: 'secondary.dark',
+                    bgcolor: alpha(theme.palette.secondary.main, 0.1),
+                  },
+                }}
+              >
+                {!isMobile && 'IA Guion'}
               </Button>
               
               <Button 
