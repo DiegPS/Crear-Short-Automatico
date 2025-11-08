@@ -174,6 +174,7 @@ const VideoCreator: React.FC = () => {
     voice: VoiceEnum.af_heart,
     orientation: OrientationEnum.portrait,
     musicVolume: MusicVolumeEnum.high,
+    language: "es",
   });
 
   const { data: voices = [], isLoading: loadingVoices } = useQuery({
@@ -1058,21 +1059,14 @@ const VideoCreator: React.FC = () => {
 
                   <Grid item xs={12} sm={6}>
                     <FormControl fullWidth>
-                      <InputLabel>Idioma para Subtítulos</InputLabel>
+                      <InputLabel>Idioma</InputLabel>
                       <Select
-                        value={config.language || "auto"}
+                        value={config.language || "es"}
                         onChange={(e) => {
-                          const value = e.target.value === "auto" ? undefined : e.target.value;
-                          handleConfigChange("language", value);
+                          handleConfigChange("language", e.target.value);
                         }}
-                        label="Idioma para Subtítulos"
+                        label="Idioma"
                       >
-                        <MenuItem value="auto">
-                          <Box display="flex" alignItems="center" gap={1}>
-                            <LanguageIcon fontSize="small" />
-                            <span>Auto-detectar</span>
-                          </Box>
-                        </MenuItem>
                         <MenuItem value="es">
                           <Box display="flex" alignItems="center" gap={1}>
                             <span>🇪🇸</span>
@@ -1087,7 +1081,7 @@ const VideoCreator: React.FC = () => {
                         </MenuItem>
                       </Select>
                       <FormHelperText>
-                        Selecciona el idioma para la transcripción. Auto-detectar identificará el idioma automáticamente.
+                        Selecciona el idioma para la generación de voz y transcripción de subtítulos.
                       </FormHelperText>
                     </FormControl>
                   </Grid>
@@ -1151,7 +1145,7 @@ const VideoCreator: React.FC = () => {
                       <Typography variant="body1">
                         {config.language === "es" ? "🇪🇸 Español" : 
                          config.language === "en" ? "🇬🇧 Inglés" : 
-                         "🌐 Auto-detectar"}
+                         "🇪🇸 Español (default)"}
                       </Typography>
                     </Grid>
                   </Grid>

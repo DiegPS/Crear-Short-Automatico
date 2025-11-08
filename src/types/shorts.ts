@@ -130,8 +130,8 @@ export const renderConfig = z.object({
     .describe("Volume of the music, default is high"),
   language: z
     .string()
-    .optional()
-    .describe("Language code for Whisper transcription (e.g., 'es' for Spanish, 'en' for English). If not specified, Whisper will auto-detect the language."),
+    .default("es")
+    .describe("Language code for voice generation and transcription (e.g., 'es' for Spanish, 'en' for English). Default is 'es'."),
 });
 export type RenderConfig = z.infer<typeof renderConfig>;
 

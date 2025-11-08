@@ -190,7 +190,7 @@ export class ShortCreator {
           const fullTempWavPath = path.join(this.config.tempDirPath, `full_${tempId}.wav`);
           tempFiles.push(fullTempWavPath);
           await this.ffmpeg.normalizeAudioFile(audioFilePath, fullTempWavPath);
-          const fullCaptions = await this.whisper.CreateCaption(fullTempWavPath, config.language);
+          const fullCaptions = await this.whisper.CreateCaption(fullTempWavPath, config.language ?? "es");
           
           // Find natural cut points (pauses between captions and sentence endings)
           const cutPoints: number[] = [0]; // Always start at 0
@@ -354,10 +354,11 @@ export class ShortCreator {
       } else if ('text' in scene && scene.text) {
         // Generate audio using Kokoro (original flow)
         // Pass language to Kokoro so it can use Python for Spanish
+        // Ensure language is always set (default from schema is "es")
         const audio = await this.kokoro.generate(
           scene.text,
           config.voice ?? "af_heart",
-          config.language,
+          config.language ?? "es",
         );
         audioLength = audio.audioLength;
         audioStream = audio.audio;
@@ -369,7 +370,8 @@ export class ShortCreator {
       }
 
       // Generate captions using Whisper
-      const captions = await this.whisper.CreateCaption(tempWavPath, config.language);
+      // Ensure language is always set (default from schema is "es")
+      const captions = await this.whisper.CreateCaption(tempWavPath, config.language ?? "es");
 
       // add the paddingBack in seconds to the last scene
       if (index + 1 === inputScenes.length && config.paddingBack) {

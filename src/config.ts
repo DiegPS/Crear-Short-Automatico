@@ -63,7 +63,7 @@ export class Config {
   public devMode: boolean;
   public whisperVersion: string = whisperVersion;
   public whisperModel: whisperModels = defaultWhisperModel;
-  public whisperLanguage: string | null = null; // null = auto-detect, "es" = español, "en" = inglés, etc.
+  public whisperLanguage: string | null = null; // null = usar el idioma del config, "es" = español, "en" = inglés, etc.
   public kokoroModelPrecision: kokoroModelPrecision = "fp32";
 
   // docker-specific, performance-related settings to prevent memory issues

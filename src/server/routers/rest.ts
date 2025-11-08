@@ -86,8 +86,6 @@ export class APIRouter {
         try {
           const input = validateCreateShortInput(req.body);
 
-          logger.info({ input }, "Creating short video");
-
           const videoId = this.shortCreator.addToQueue(
             input.scenes,
             input.config,

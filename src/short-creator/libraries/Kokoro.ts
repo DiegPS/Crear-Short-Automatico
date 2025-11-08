@@ -5,15 +5,21 @@ import {
   type Voices,
 } from "../../types/shorts";
 import { KOKORO_MODEL, logger, Config } from "../../config";
-import { execFile } from "child_process";
+import { execFile, spawn, ChildProcess } from "child_process";
 import { promisify } from "util";
 import path from "path";
 import fs from "fs-extra";
 import { randomUUID } from "crypto";
+import { Readable, Writable } from "stream";
 
 const execFileAsync = promisify(execFile);
 
 export class Kokoro {
+  private pythonServer: ChildProcess | null = null;
+  private pythonServerReady: boolean = false;
+  private pythonServerPath: string | null = null;
+  private pythonPath: string | null = null;
+  
   constructor(
     private tts: KokoroTTS,
     private config: Config,
@@ -94,6 +100,188 @@ export class Kokoro {
   }
 
   /**
+   * Inicia el servidor Python persistente si no está corriendo
+   */
+  private async ensurePythonServer(): Promise<void> {
+    if (this.pythonServer && this.pythonServerReady) {
+      return;
+    }
+
+    // Buscar el script del servidor
+    const possibleServerPaths = [
+      path.join(__dirname, "kokoro_python_server.py"),
+      path.join(__dirname, "../../../src/short-creator/libraries/kokoro_python_server.py"),
+      path.join(this.config.packageDirPath, "src/short-creator/libraries/kokoro_python_server.py"),
+      path.join(this.config.packageDirPath, "dist/short-creator/libraries/kokoro_python_server.py"),
+    ];
+
+    let serverPath: string | null = null;
+    for (const possiblePath of possibleServerPaths) {
+      if (await fs.pathExists(possiblePath)) {
+        serverPath = possiblePath;
+        break;
+      }
+    }
+
+    if (!serverPath) {
+      logger.warn("Python server script not found, falling back to one-time execution");
+      return;
+    }
+
+    // Buscar python3
+    const pythonPaths = [
+      "python3",
+      path.join(this.config.packageDirPath, "venv/bin/python3"),
+      "python",
+    ];
+
+    let pythonPath: string | null = null;
+    for (const possiblePath of pythonPaths) {
+      try {
+        await execFileAsync(possiblePath, ["--version"]);
+        pythonPath = possiblePath;
+        break;
+      } catch {
+        // Continuar buscando
+      }
+    }
+
+    if (!pythonPath) {
+      logger.warn("Python3 not found, falling back to one-time execution");
+      return;
+    }
+
+    this.pythonPath = pythonPath;
+    this.pythonServerPath = serverPath;
+
+    // Iniciar el servidor
+    this.pythonServer = spawn(pythonPath, [serverPath], {
+      stdio: ["pipe", "pipe", "pipe"],
+    });
+
+    this.pythonServer.stderr?.on("data", (data) => {
+      const message = data.toString();
+      // Solo loguear errores reales, no warnings
+      if (!/(UserWarning|FutureWarning|Warning:)/i.test(message)) {
+        logger.warn({ stderr: message }, "Python server stderr");
+      }
+    });
+
+    this.pythonServer.on("error", (error) => {
+      logger.error({ error }, "Python server error");
+      this.pythonServer = null;
+      this.pythonServerReady = false;
+    });
+
+    this.pythonServer.on("exit", (code) => {
+      logger.warn({ code }, "Python server exited");
+      this.pythonServer = null;
+      this.pythonServerReady = false;
+    });
+
+    // Verificar que el servidor esté listo
+    await new Promise<void>((resolve, reject) => {
+      const timeout = setTimeout(() => {
+        reject(new Error("Python server startup timeout"));
+      }, 30000); // 30 segundos para cargar el modelo
+
+      const onData = (data: Buffer) => {
+        try {
+          const response = JSON.parse(data.toString());
+          if (response.success && response.message === "pong") {
+            clearTimeout(timeout);
+            this.pythonServer?.stdout?.removeListener("data", onData);
+            this.pythonServerReady = true;
+            logger.debug("Python server ready");
+            resolve();
+          }
+        } catch {
+          // Ignorar líneas que no son JSON
+        }
+      };
+
+      this.pythonServer?.stdout?.on("data", onData);
+
+      // Enviar ping
+      const pingCommand = JSON.stringify({ action: "ping" }) + "\n";
+      this.pythonServer?.stdin?.write(pingCommand);
+    });
+  }
+
+  /**
+   * Genera audio usando el servidor Python persistente
+   */
+  private async generateWithPythonServer(
+    text: string,
+    voice: Voices,
+    langCode: string,
+    outputPath: string,
+  ): Promise<{ duration: number }> {
+    const server = this.pythonServer;
+    if (!server || !this.pythonServerReady) {
+      throw new Error("Python server not ready");
+    }
+
+    const stdout = server.stdout;
+    const stdin = server.stdin;
+    
+    if (!stdout || !stdin) {
+      throw new Error("Python server streams not available");
+    }
+
+    return new Promise((resolve, reject) => {
+      const timeout = setTimeout(() => {
+        reject(new Error("Python server request timeout"));
+      }, 60000); // 60 segundos timeout
+
+      const onData = (data: Buffer) => {
+        try {
+          const lines = data.toString().split("\n").filter((l) => l.trim());
+          for (const line of lines) {
+            try {
+              const response = JSON.parse(line);
+              if (response.success !== undefined) {
+                clearTimeout(timeout);
+                stdout.removeListener("data", onData);
+                if (response.success) {
+                  resolve({ duration: response.duration });
+                } else {
+                  reject(new Error(response.error || "Python server error"));
+                }
+                return;
+              }
+            } catch {
+              // Ignorar líneas que no son JSON
+            }
+          }
+        } catch (error) {
+          clearTimeout(timeout);
+          stdout.removeListener("data", onData);
+          reject(error);
+        }
+      };
+
+      stdout.on("data", onData);
+
+      const command = JSON.stringify({
+        action: "generate",
+        text,
+        voice,
+        lang_code: langCode,
+        output_path: outputPath,
+      }) + "\n";
+
+      stdin.write(command, (error) => {
+        if (error) {
+          clearTimeout(timeout);
+          stdout.removeListener("data", onData);
+          reject(error);
+        }
+      });
+    });
+  }
+
+  /**
    * Genera audio usando Kokoro Python (soporta español y otros idiomas)
    */
   private async generateWithPython(
@@ -104,34 +292,10 @@ export class Kokoro {
     audio: ArrayBuffer;
     audioLength: number;
   }> {
+    const startTime = Date.now();
     const langCode = this.getKokoroLangCode(language);
     // Validar y mapear la voz según el idioma
     const validVoice = this.getValidVoiceForLanguage(voice, language);
-    
-    // Buscar el script en múltiples ubicaciones posibles
-    // 1. En dist (producción)
-    // 2. En src (desarrollo)
-    // 3. En el directorio del proyecto
-    const possiblePaths = [
-      path.join(__dirname, "kokoro_python_helper.py"), // dist/short-creator/libraries/
-      path.join(__dirname, "../../../src/short-creator/libraries/kokoro_python_helper.py"), // src desde dist
-      path.join(this.config.packageDirPath, "src/short-creator/libraries/kokoro_python_helper.py"), // src desde package
-      path.join(this.config.packageDirPath, "dist/short-creator/libraries/kokoro_python_helper.py"), // dist desde package
-    ];
-    
-    let scriptPath: string | null = null;
-    for (const possiblePath of possiblePaths) {
-      if (await fs.pathExists(possiblePath)) {
-        scriptPath = possiblePath;
-        break;
-      }
-    }
-    
-    if (!scriptPath) {
-      throw new Error(
-        `Kokoro Python helper script not found. Searched in: ${possiblePaths.join(", ")}`,
-      );
-    }
     
     const outputPath = path.join(
       this.config.tempDirPath,
@@ -139,11 +303,78 @@ export class Kokoro {
     );
 
     try {
+      // Intentar usar el servidor persistente primero
+      await this.ensurePythonServer();
+      
+      if (this.pythonServer && this.pythonServerReady) {
+        // Usar servidor persistente (mucho más rápido)
+        const pythonStartTime = Date.now();
+        const result = await this.generateWithPythonServer(
+          text,
+          validVoice,
+          langCode,
+          outputPath,
+        );
+        const pythonTime = Date.now() - pythonStartTime;
+        logger.debug({ pythonTime: `${pythonTime}ms` }, "Python server execution time");
+        
+        // Leer el archivo WAV generado
+        const audioBuffer = await fs.readFile(outputPath);
+        const audioArrayBuffer = audioBuffer.buffer.slice(
+          audioBuffer.byteOffset,
+          audioBuffer.byteOffset + audioBuffer.byteLength,
+        );
 
-      // Buscar python3 en diferentes ubicaciones
-      // 1. python3 del sistema
-      // 2. python3 del venv si existe
-      // 3. python del sistema
+        // Limpiar el archivo temporal
+        await fs.remove(outputPath);
+
+        const totalTime = Date.now() - startTime;
+        logger.debug(
+          { 
+            text, 
+            voice: validVoice, 
+            originalVoice: voice, 
+            language, 
+            langCode, 
+            audioLength: result.duration,
+            totalTime: `${totalTime}ms`,
+            pythonTime: `${pythonTime}ms`
+          },
+          "Audio generated with Kokoro Python (persistent server)",
+        );
+
+        return {
+          audio: audioArrayBuffer,
+          audioLength: result.duration,
+        };
+      }
+      
+      // Fallback: usar script one-time (más lento pero funciona)
+      logger.debug("Using one-time Python script (server not available)");
+      
+      // Buscar el script en múltiples ubicaciones posibles
+      const possiblePaths = [
+        path.join(__dirname, "kokoro_python_helper.py"),
+        path.join(__dirname, "../../../src/short-creator/libraries/kokoro_python_helper.py"),
+        path.join(this.config.packageDirPath, "src/short-creator/libraries/kokoro_python_helper.py"),
+        path.join(this.config.packageDirPath, "dist/short-creator/libraries/kokoro_python_helper.py"),
+      ];
+      
+      let scriptPath: string | null = null;
+      for (const possiblePath of possiblePaths) {
+        if (await fs.pathExists(possiblePath)) {
+          scriptPath = possiblePath;
+          break;
+        }
+      }
+      
+      if (!scriptPath) {
+        throw new Error(
+          `Kokoro Python helper script not found. Searched in: ${possiblePaths.join(", ")}`,
+        );
+      }
+
+      // Buscar python3
       const pythonPaths = [
         "python3",
         path.join(this.config.packageDirPath, "venv/bin/python3"),
@@ -166,6 +397,7 @@ export class Kokoro {
       }
 
       // Ejecutar el script Python con la voz validada
+      const pythonStartTime = Date.now();
       const { stdout, stderr } = await execFileAsync(pythonPath, [
         scriptPath,
         text,
@@ -173,6 +405,8 @@ export class Kokoro {
         langCode,
         outputPath,
       ]);
+      const pythonTime = Date.now() - pythonStartTime;
+      logger.debug({ pythonTime: `${pythonTime}ms` }, "Python script execution time");
 
       // Los warnings de PyTorch van a stderr, pero no son errores críticos
       // Solo loguear si hay contenido en stderr que no sean warnings comunes
@@ -222,8 +456,18 @@ export class Kokoro {
       // Limpiar el archivo temporal
       await fs.remove(outputPath);
 
+      const totalTime = Date.now() - startTime;
       logger.debug(
-        { text, voice: validVoice, originalVoice: voice, language, langCode, audioLength: result.duration },
+        { 
+          text, 
+          voice: validVoice, 
+          originalVoice: voice, 
+          language, 
+          langCode, 
+          audioLength: result.duration,
+          totalTime: `${totalTime}ms`,
+          pythonTime: `${pythonTime}ms`
+        },
         "Audio generated with Kokoro Python",
       );
 
@@ -328,7 +572,22 @@ export class Kokoro {
       device: "cpu", // only "cpu" is supported in node
     });
 
-    return new Kokoro(tts, config);
+    const kokoro = new Kokoro(tts, config);
+    
+    // Intentar iniciar el servidor Python al inicio (opcional, fallback a one-time si falla)
+    logger.debug("initializing python server for Kokoro");
+    try {
+      await kokoro.ensurePythonServer();
+      if (kokoro.pythonServer && kokoro.pythonServerReady) {
+        logger.debug("Python server initialized successfully");
+      } else {
+        logger.debug("Python server not available, will use one-time execution");
+      }
+    } catch (error) {
+      logger.warn({ error }, "Failed to initialize Python server, will use one-time execution");
+    }
+    
+    return kokoro;
   }
 
   listAvailableVoices(): Voices[] {

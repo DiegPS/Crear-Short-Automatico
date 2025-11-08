@@ -151,8 +151,9 @@ export class Whisper {
 
   // todo shall we extract it to a Caption class?
   async CreateCaption(audioPath: string, language?: string | null): Promise<Caption[]> {
-    // Usar el idioma pasado como parámetro, o el de la configuración global, o null (auto-detect)
-    const targetLanguage = language ?? this.config.whisperLanguage;
+    // Usar el idioma pasado como parámetro, o el de la configuración global
+    // Si no se especifica, se usa el idioma del config (default: "es")
+    const targetLanguage = language ?? this.config.whisperLanguage ?? "es";
     // Seleccionar el modelo apropiado basado en el idioma
     const modelToUse = this.getModelForLanguage(targetLanguage);
     logger.debug({ audioPath, language: targetLanguage, model: modelToUse }, "Starting to transcribe audio");
@@ -174,12 +175,10 @@ export class Whisper {
       },
     };
     
-    // Agregar language si está especificado (null = auto-detect)
+    // Agregar language siempre (ya no usamos auto-detect)
     // Nota: La librería puede no soportar task directamente, pero el modelo .en ya indica que es solo inglés
     // y el modelo multilingüe sin .en transcribe sin traducir por defecto
-    if (targetLanguage) {
-      transcribeOptions.language = targetLanguage as any;
-    }
+    transcribeOptions.language = targetLanguage as any;
     
     const { transcription } = await transcribe(transcribeOptions);
     logger.debug({ audioPath }, "Transcription finished, creating captions");
