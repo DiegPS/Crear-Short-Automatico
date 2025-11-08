@@ -338,6 +338,10 @@ export class APIRouter {
           const filepath = path.join(this.config.imagesDirPath, filename);
 
           await imageFile.mv(filepath);
+          
+          // Guardar en la base de datos
+          this.database.insertImage(imageId, filename, "ready");
+          
           res.status(201).json({
             imageId,
           });
@@ -517,6 +521,10 @@ export class APIRouter {
           const filepath = path.join(this.config.audioDirPath, filename);
 
           await audioFile.mv(filepath);
+          
+          // Guardar en la base de datos
+          this.database.insertAudio(audioId, filename, "ready");
+          
           res.status(201).json({
             audioId,
           });

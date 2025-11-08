@@ -469,81 +469,74 @@ export class ShortCreator {
     const files = fs.readdirSync(this.config.imagesDirPath);
     const imageFile = files.find(file => file.startsWith(imageId));
     
-    if (!imageFile) {
-      throw new Error(`Image ${imageId} not found`);
+    // Eliminar archivo si existe
+    if (imageFile) {
+      const imagePath = path.join(this.config.imagesDirPath, imageFile);
+      fs.removeSync(imagePath);
+      logger.debug({ imageId }, "Deleted image file");
     }
-
-    const imagePath = path.join(this.config.imagesDirPath, imageFile);
-    fs.removeSync(imagePath);
-    logger.debug({ imageId }, "Deleted image file");
+    
+    // Eliminar de la base de datos
+    this.database.deleteImage(imageId);
+    logger.debug({ imageId }, "Deleted image from database");
   }
 
   public deleteAudio(audioId: string): void {
     const files = fs.readdirSync(this.config.audioDirPath);
     const audioFile = files.find(file => file.startsWith(audioId));
     
-    if (!audioFile) {
-      throw new Error(`Audio ${audioId} not found`);
+    // Eliminar archivo si existe
+    if (audioFile) {
+      const audioPath = path.join(this.config.audioDirPath, audioFile);
+      fs.removeSync(audioPath);
+      logger.debug({ audioId }, "Deleted audio file");
     }
-
-    const audioPath = path.join(this.config.audioDirPath, audioFile);
-    fs.removeSync(audioPath);
-    logger.debug({ audioId }, "Deleted audio file");
+    
+    // Eliminar de la base de datos
+    this.database.deleteAudio(audioId);
+    logger.debug({ audioId }, "Deleted audio from database");
   }
 
   public listAllAudios(): { id: string; filename: string; status: ImageStatus }[] {
-    const audios: { id: string; filename: string; status: ImageStatus }[] = [];
-
-    // Check if audio directory exists
-    if (!fs.existsSync(this.config.audioDirPath)) {
-      return audios;
-    }
-
-    // Read all files in the audio directory
-    const files = fs.readdirSync(this.config.audioDirPath);
-
-    // Process each audio file
-    for (const file of files) {
-      const id = path.parse(file).name;
-      let status: ImageStatus = "ready";
-
-      // Check if audio is being used in any processing video
-      const isInQueue = this.queue.some(item => {
-        if ('audioId' in item.sceneInput[0]) {
-          return (item.sceneInput as SceneInput[]).some(
-            scene => 'audioId' in scene && scene.audioId === id
-          );
-        }
-        return false;
+    // Obtener todos los audios de la base de datos
+    const dbAudios = this.database.getAllAudios();
+    
+    // Crear un mapa para actualizar estados de audios en cola
+    const audiosMap = new Map<string, { id: string; filename: string; status: ImageStatus }>();
+    
+    // Agregar audios de la DB
+    for (const dbAudio of dbAudios) {
+      audiosMap.set(dbAudio.id, {
+        id: dbAudio.id,
+        filename: dbAudio.filename,
+        status: dbAudio.status,
       });
-
-      if (isInQueue) {
-        status = "processing";
-      }
-
-      audios.push({ id, filename: file, status });
     }
-
-    // Add audios that are in the queue but not yet rendered
+    
+    // Actualizar estados de audios que están en la cola (processing)
     for (const queueItem of this.queue) {
       if (Array.isArray(queueItem.sceneInput) && queueItem.sceneInput.length > 0) {
         const scenes = queueItem.sceneInput as SceneInput[];
         for (const scene of scenes) {
           if ('audioId' in scene && scene.audioId) {
-            const existingAudio = audios.find(audio => audio.id === scene.audioId);
-            if (!existingAudio) {
-              audios.push({
+            const existing = audiosMap.get(scene.audioId);
+            if (existing) {
+              existing.status = "processing";
+            } else {
+              // Audio en cola pero no en DB (no debería pasar, pero por seguridad)
+              audiosMap.set(scene.audioId, {
                 id: scene.audioId,
                 filename: `${scene.audioId} (processing)`,
-                status: "processing"
+                status: "processing",
               });
             }
           }
         }
       }
     }
-
-    return audios;
+    
+    // Convertir mapa a array
+    return Array.from(audiosMap.values());
   }
 
   public getAudio(audioId: string): Buffer {
@@ -620,57 +613,43 @@ export class ShortCreator {
   }
 
   public listAllImages(): { id: string; filename: string; status: ImageStatus }[] {
-    const images: { id: string; filename: string; status: ImageStatus }[] = [];
-
-    // Check if images directory exists
-    if (!fs.existsSync(this.config.imagesDirPath)) {
-      return images;
-    }
-
-    // Read all files in the images directory
-    const files = fs.readdirSync(this.config.imagesDirPath);
-
-    // Process each image file
-    for (const file of files) {
-      const id = path.parse(file).name;
-      let status: ImageStatus = "ready";
-
-      // Check if image is being used in any processing ken burst video
-      const isInQueue = this.queue.some(item => {
-        if ('imageId' in item.sceneInput[0]) {
-          return (item.sceneInput as KenBurstSceneInput[]).some(
-            scene => scene.imageId === id
-          );
-        }
-        return false;
+    // Obtener todas las imágenes de la base de datos
+    const dbImages = this.database.getAllImages();
+    
+    // Crear un mapa para actualizar estados de imágenes en cola
+    const imagesMap = new Map<string, { id: string; filename: string; status: ImageStatus }>();
+    
+    // Agregar imágenes de la DB
+    for (const dbImage of dbImages) {
+      imagesMap.set(dbImage.id, {
+        id: dbImage.id,
+        filename: dbImage.filename,
+        status: dbImage.status,
       });
-
-      if (isInQueue) {
-        status = "processing";
-      }
-
-      images.push({ id, filename: file, status });
     }
-
-    // Add images that are in the queue but not yet rendered
+    
+    // Actualizar estados de imágenes que están en la cola (processing)
     for (const queueItem of this.queue) {
       if ('imageId' in queueItem.sceneInput[0]) {
         const kenBurstScenes = queueItem.sceneInput as KenBurstSceneInput[];
         for (const scene of kenBurstScenes) {
-          const existingImage = images.find(img => img.id === scene.imageId);
-          if (!existingImage) {
-            // If image is not found in the directory but is in queue, add it with processing status
-            images.push({
+          const existing = imagesMap.get(scene.imageId);
+          if (existing) {
+            existing.status = "processing";
+          } else {
+            // Imagen en cola pero no en DB (no debería pasar, pero por seguridad)
+            imagesMap.set(scene.imageId, {
               id: scene.imageId,
               filename: `${scene.imageId} (processing)`,
-              status: "processing"
+              status: "processing",
             });
           }
         }
       }
     }
-
-    return images;
+    
+    // Convertir mapa a array
+    return Array.from(imagesMap.values());
   }
 
   public ListAvailableVoices(): string[] {
