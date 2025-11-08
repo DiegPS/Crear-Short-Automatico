@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useCallback } from "react";
+import React, { useState, useMemo, useCallback, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import axios from "axios";
@@ -171,7 +171,7 @@ const VideoCreator: React.FC = () => {
     music: MusicMoodEnum.chill,
     captionPosition: CaptionPositionEnum.center,
     captionBackgroundColor: "#3b82f6",
-    voice: VoiceEnum.af_heart,
+    voice: VoiceEnum.ef_dora, // Voz por defecto para español
     orientation: OrientationEnum.portrait,
     musicVolume: MusicVolumeEnum.high,
     language: "es",
@@ -298,8 +298,63 @@ const VideoCreator: React.FC = () => {
   }, [scenes]);
 
   const handleConfigChange = useCallback((field: keyof RenderConfig, value: any) => {
-    setConfig({ ...config, [field]: value });
-  }, [config]);
+    setConfig((prevConfig) => ({ ...prevConfig, [field]: value }));
+  }, []);
+
+  // Validar y corregir la voz cuando cambia el idioma o se cargan las voces
+  useEffect(() => {
+    if (loadingVoices || voices.length === 0) return;
+
+    const spanishVoices: VoiceEnum[] = [VoiceEnum.ef_dora, VoiceEnum.em_alex, VoiceEnum.em_santa];
+    const currentLanguage = config.language || "es";
+    const currentVoice = config.voice;
+    
+    if (!currentVoice) {
+      // Si no hay voz seleccionada, establecer una por defecto según el idioma
+      const defaultVoice = currentLanguage === "es" 
+        ? VoiceEnum.ef_dora 
+        : (voices.find(voice => !spanishVoices.includes(voice as VoiceEnum)) || VoiceEnum.af_heart) as VoiceEnum;
+      setConfig((prevConfig) => ({ ...prevConfig, voice: defaultVoice }));
+      return;
+    }
+
+    const isSpanishVoice = spanishVoices.includes(currentVoice as VoiceEnum);
+    const isCurrentLanguageSpanish = currentLanguage === "es";
+
+    // Si el idioma es español pero la voz no es española, cambiar a ef_dora
+    if (isCurrentLanguageSpanish && !isSpanishVoice) {
+      setConfig((prevConfig) => {
+        if (prevConfig.voice === VoiceEnum.ef_dora) return prevConfig; // Evitar actualización innecesaria
+        return { ...prevConfig, voice: VoiceEnum.ef_dora };
+      });
+      return;
+    }
+
+    // Si el idioma no es español pero la voz es española, cambiar a la primera voz inglesa disponible
+    if (!isCurrentLanguageSpanish && isSpanishVoice) {
+      const englishVoices = voices.filter(voice => !spanishVoices.includes(voice as VoiceEnum));
+      const defaultEnglishVoice = englishVoices.length > 0 ? englishVoices[0] : VoiceEnum.af_heart;
+      setConfig((prevConfig) => {
+        if (prevConfig.voice === defaultEnglishVoice) return prevConfig; // Evitar actualización innecesaria
+        return { ...prevConfig, voice: defaultEnglishVoice as VoiceEnum };
+      });
+      return;
+    }
+
+    // Verificar que la voz actual esté disponible para el idioma seleccionado
+    const availableVoices = isCurrentLanguageSpanish
+      ? voices.filter(voice => spanishVoices.includes(voice as VoiceEnum))
+      : voices.filter(voice => !spanishVoices.includes(voice as VoiceEnum));
+
+    if (availableVoices.length > 0 && !availableVoices.includes(currentVoice)) {
+      // Si la voz actual no está disponible, usar la primera disponible
+      const newVoice = availableVoices[0] as VoiceEnum;
+      setConfig((prevConfig) => {
+        if (prevConfig.voice === newVoice) return prevConfig; // Evitar actualización innecesaria
+        return { ...prevConfig, voice: newVoice };
+      });
+    }
+  }, [config.language, config.voice, voices, loadingVoices]);
 
   const handleImageUpload = useCallback(async (index: number, file: File) => {
     try {
@@ -359,7 +414,11 @@ const VideoCreator: React.FC = () => {
     });
   }, [scenes, videoType]);
 
-  const handleNext = () => {
+  const handleNext = (e?: React.MouseEvent) => {
+    if (e) {
+      e.preventDefault();
+      e.stopPropagation();
+    }
     if (activeStep === 0 && !validateScenes) return;
     setActiveStep((prev) => prev + 1);
   };
@@ -370,6 +429,11 @@ const VideoCreator: React.FC = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    
+    // Solo procesar el submit si estamos en el paso final (Revisar)
+    if (activeStep !== 2) {
+      return;
+    }
     
     if (!validateScenes) {
       setActiveStep(0);
@@ -442,8 +506,9 @@ const VideoCreator: React.FC = () => {
         <ToggleButtonGroup
           value={videoType}
           exclusive
+          disabled={activeStep >= 1} // Deshabilitar cuando se está en paso 2 o 3
           onChange={(_, value) => {
-            if (value) {
+            if (value && activeStep === 0) { // Solo permitir cambio en el paso 1
               setVideoType(value);
               setScenes([{ text: "", searchTerms: "" }]);
               setFullText("");
@@ -932,6 +997,97 @@ const VideoCreator: React.FC = () => {
 
                 <Grid container spacing={3}>
                   <Grid item xs={12} sm={6}>
+                    <FormControl fullWidth>
+                      <InputLabel>Idioma</InputLabel>
+                      <Select
+                        value={config.language || "es"}
+                        onChange={(e) => {
+                          handleConfigChange("language", e.target.value);
+                          // El useEffect se encargará de validar y corregir la voz automáticamente
+                        }}
+                        label="Idioma"
+                        required
+                      >
+                        <MenuItem value="es">
+                          <Box display="flex" alignItems="center" gap={1}>
+                            <span>🇪🇸</span>
+                            <span>Español</span>
+                          </Box>
+                        </MenuItem>
+                        <MenuItem value="en">
+                          <Box display="flex" alignItems="center" gap={1}>
+                            <span>🇬🇧</span>
+                            <span>Inglés</span>
+                          </Box>
+                        </MenuItem>
+                      </Select>
+                      <FormHelperText>
+                        Selecciona el idioma para la generación de voz y transcripción de subtítulos.
+                      </FormHelperText>
+                    </FormControl>
+                  </Grid>
+
+                  <Grid item xs={12} sm={6}>
+                    <FormControl fullWidth>
+                      <InputLabel>Voz</InputLabel>
+                      <Select
+                        value={config.voice || ""}
+                        onChange={(e) => handleConfigChange("voice", e.target.value)}
+                        label="Voz"
+                        required
+                        disabled={loadingVoices}
+                        renderValue={(value) => {
+                          if (!value) return "";
+                          const voiceParts = String(value).split("_");
+                          return voiceParts.length > 1 
+                            ? voiceParts[1].charAt(0).toUpperCase() + voiceParts[1].slice(1)
+                            : String(value);
+                        }}
+                      >
+                        {loadingVoices ? (
+                          <MenuItem disabled>
+                            <CircularProgress size={20} sx={{ mr: 1 }} />
+                            Cargando voces...
+                          </MenuItem>
+                        ) : (() => {
+                          // Filtrar voces según el idioma seleccionado
+                          const spanishVoices: VoiceEnum[] = [VoiceEnum.ef_dora, VoiceEnum.em_alex, VoiceEnum.em_santa];
+                          const availableVoices = (config.language || "es") === "es"
+                            ? voices.filter(voice => spanishVoices.includes(voice as VoiceEnum))
+                            : voices.filter(voice => !spanishVoices.includes(voice as VoiceEnum));
+                          
+                          if (availableVoices.length === 0) {
+                            return (
+                              <MenuItem disabled>
+                                No hay voces disponibles
+                              </MenuItem>
+                            );
+                          }
+                          
+                          return availableVoices.map((voice) => {
+                            // Formatear el nombre de la voz: split por "_", tomar segunda parte, capitalizar
+                            const voiceParts = voice.split("_");
+                            const voiceName = voiceParts.length > 1 
+                              ? voiceParts[1].charAt(0).toUpperCase() + voiceParts[1].slice(1)
+                              : voice;
+                            
+                            return (
+                              <MenuItem key={voice} value={voice}>
+                                {voiceName}
+                              </MenuItem>
+                            );
+                          });
+                        })()}
+                      </Select>
+                      <FormHelperText>
+                        {config.language === "es" 
+                          ? "Voces disponibles para español: ef_dora, em_alex, em_santa"
+                          : "Voces disponibles para inglés"}
+                      </FormHelperText>
+                    </FormControl>
+                  </Grid>
+
+                  <Grid item xs={12} sm={6}>
                     <TextField
                       fullWidth
                       type="number"
@@ -977,11 +1133,18 @@ const VideoCreator: React.FC = () => {
                         label="Posición de los Subtítulos"
                         required
                       >
-                        {Object.values(CaptionPositionEnum).map((position) => (
-                          <MenuItem key={position} value={position}>
-                            {position}
-                          </MenuItem>
-                        ))}
+                        {Object.values(CaptionPositionEnum).map((position) => {
+                          const positionLabels: Record<CaptionPositionEnum, string> = {
+                            [CaptionPositionEnum.top]: "Arriba",
+                            [CaptionPositionEnum.center]: "Centro",
+                            [CaptionPositionEnum.bottom]: "Abajo",
+                          };
+                          return (
+                            <MenuItem key={position} value={position}>
+                              {positionLabels[position]}
+                            </MenuItem>
+                          );
+                        })}
                       </Select>
                     </FormControl>
                   </Grid>
@@ -1001,24 +1164,6 @@ const VideoCreator: React.FC = () => {
 
                   <Grid item xs={12} sm={6}>
                     <FormControl fullWidth>
-                      <InputLabel>Voz</InputLabel>
-                      <Select
-                        value={config.voice}
-                        onChange={(e) => handleConfigChange("voice", e.target.value)}
-                        label="Voz"
-                        required
-                      >
-                        {voices.map((voice) => (
-                          <MenuItem key={voice} value={voice}>
-                            {voice}
-                          </MenuItem>
-                        ))}
-                      </Select>
-                    </FormControl>
-                  </Grid>
-
-                  <Grid item xs={12} sm={6}>
-                    <FormControl fullWidth>
                       <InputLabel>Orientación</InputLabel>
                       <Select
                         value={config.orientation}
@@ -1028,11 +1173,17 @@ const VideoCreator: React.FC = () => {
                         label="Orientación"
                         required
                       >
-                        {Object.values(OrientationEnum).map((orientation) => (
-                          <MenuItem key={orientation} value={orientation}>
-                            {orientation}
-                          </MenuItem>
-                        ))}
+                        {Object.values(OrientationEnum).map((orientation) => {
+                          const orientationLabels: Record<OrientationEnum, string> = {
+                            [OrientationEnum.portrait]: "Vertical",
+                            [OrientationEnum.landscape]: "Horizontal",
+                          };
+                          return (
+                            <MenuItem key={orientation} value={orientation}>
+                              {orientationLabels[orientation]}
+                            </MenuItem>
+                          );
+                        })}
                       </Select>
                     </FormControl>
                   </Grid>
@@ -1054,35 +1205,6 @@ const VideoCreator: React.FC = () => {
                           </MenuItem>
                         ))}
                       </Select>
-                    </FormControl>
-                  </Grid>
-
-                  <Grid item xs={12} sm={6}>
-                    <FormControl fullWidth>
-                      <InputLabel>Idioma</InputLabel>
-                      <Select
-                        value={config.language || "es"}
-                        onChange={(e) => {
-                          handleConfigChange("language", e.target.value);
-                        }}
-                        label="Idioma"
-                      >
-                        <MenuItem value="es">
-                          <Box display="flex" alignItems="center" gap={1}>
-                            <span>🇪🇸</span>
-                            <span>Español</span>
-                          </Box>
-                        </MenuItem>
-                        <MenuItem value="en">
-                          <Box display="flex" alignItems="center" gap={1}>
-                            <span>🇬🇧</span>
-                            <span>Inglés</span>
-                          </Box>
-                        </MenuItem>
-                      </Select>
-                      <FormHelperText>
-                        Selecciona el idioma para la generación de voz y transcripción de subtítulos.
-                      </FormHelperText>
                     </FormControl>
                   </Grid>
                 </Grid>
@@ -1130,7 +1252,14 @@ const VideoCreator: React.FC = () => {
                   <Grid container spacing={2}>
                     <Grid item xs={6} sm={4}>
                       <Typography variant="body2" color="text.secondary">Voz</Typography>
-                      <Typography variant="body1">{config.voice}</Typography>
+                      <Typography variant="body1">
+                        {(() => {
+                          const voiceParts = config.voice.split("_");
+                          return voiceParts.length > 1 
+                            ? voiceParts[1].charAt(0).toUpperCase() + voiceParts[1].slice(1)
+                            : config.voice;
+                        })()}
+                      </Typography>
                     </Grid>
                     <Grid item xs={6} sm={4}>
                       <Typography variant="body2" color="text.secondary">Música</Typography>
@@ -1138,7 +1267,16 @@ const VideoCreator: React.FC = () => {
                     </Grid>
                     <Grid item xs={6} sm={4}>
                       <Typography variant="body2" color="text.secondary">Orientación</Typography>
-                      <Typography variant="body1">{config.orientation}</Typography>
+                      <Typography variant="body1">
+                        {config.orientation === OrientationEnum.portrait ? "Vertical" : "Horizontal"}
+                      </Typography>
+                    </Grid>
+                    <Grid item xs={6} sm={4}>
+                      <Typography variant="body2" color="text.secondary">Posición Subtítulos</Typography>
+                      <Typography variant="body1">
+                        {config.captionPosition === CaptionPositionEnum.top ? "Arriba" :
+                         config.captionPosition === CaptionPositionEnum.center ? "Centro" : "Abajo"}
+                      </Typography>
                     </Grid>
                     <Grid item xs={6} sm={4}>
                       <Typography variant="body2" color="text.secondary">Idioma</Typography>
@@ -1157,6 +1295,7 @@ const VideoCreator: React.FC = () => {
 
         <Box display="flex" justifyContent="space-between" mt={4}>
           <Button
+            type="button"
             disabled={activeStep === 0}
             onClick={handleBack}
             size="large"
@@ -1166,8 +1305,13 @@ const VideoCreator: React.FC = () => {
           
           {activeStep < steps.length - 1 ? (
             <Button
+              type="button"
               variant="contained"
-              onClick={handleNext}
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                handleNext(e);
+              }}
               disabled={activeStep === 0 && !validateScenes}
               size="large"
             >
