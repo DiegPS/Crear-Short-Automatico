@@ -13,6 +13,11 @@ const defaultWhisperModel: whisperModels = "base"; // possible options: "tiny", 
 // Los modelos con ".en" (como "base.en") son solo para inglés pero pueden ser más precisos para ese idioma
 
 // Create the global logger
+// Use pretty printing in development (when not in Docker and output is TTY)
+const isDocker = process.env.DOCKER === "true";
+const isTTY = process.stdout.isTTY;
+const usePretty = !isDocker && isTTY;
+
 export const logger = pino({
   level: process.env.LOG_LEVEL || defaultLogLevel,
   timestamp: pino.stdTimeFunctions.isoTime,
@@ -21,6 +26,20 @@ export const logger = pino({
       return { level: label };
     },
   },
+  transport: usePretty
+    ? {
+        target: "pino-pretty",
+        options: {
+          colorize: true,
+          translateTime: "HH:MM:ss",
+          ignore: "pid,hostname",
+          singleLine: false,
+          hideObject: false,
+          messageFormat: "{msg}",
+          minimumLevel: process.env.LOG_LEVEL || "info",
+        },
+      }
+    : undefined,
 });
 
 export class Config {
