@@ -353,9 +353,11 @@ export class ShortCreator {
         audioStream = await this.ffmpeg.convertAudioFileToArrayBuffer(audioFilePath);
       } else if ('text' in scene && scene.text) {
         // Generate audio using Kokoro (original flow)
+        // Pass language to Kokoro so it can use Python for Spanish
         const audio = await this.kokoro.generate(
           scene.text,
           config.voice ?? "af_heart",
+          config.language,
         );
         audioLength = audio.audioLength;
         audioStream = audio.audio;

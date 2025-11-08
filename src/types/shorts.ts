@@ -77,6 +77,10 @@ export enum VoiceEnum {
   bf_lily = "bf_lily",
   bm_daniel = "bm_daniel",
   bm_fable = "bm_fable",
+  // Spanish voices (only available for lang_code='e')
+  ef_dora = "ef_dora",
+  em_alex = "em_alex",
+  em_santa = "em_santa",
 }
 
 export enum OrientationEnum {

@@ -44,6 +44,11 @@ RUN apt install -y \
       libpango-1.0-0 \
       libcairo2 \
       libcups2 \
+      # Python and Kokoro dependencies
+      python3 \
+      python3-pip \
+      python3-dev \
+      espeak-ng \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
 # setup pnpm
@@ -70,6 +75,8 @@ COPY static /app/static
 COPY --from=install-whisper /whisper /app/data/libs/whisper
 COPY --from=prod-deps /app/node_modules /app/node_modules
 COPY --from=build /app/dist /app/dist
+# Copy Python helper script for Kokoro
+COPY --from=build /app/src/short-creator/libraries/kokoro_python_helper.py /app/dist/short-creator/libraries/kokoro_python_helper.py
 COPY package.json /app/
 
 # app configuration via environment variables
@@ -81,6 +88,9 @@ ENV KOKORO_MODEL_PRECISION=q4
 ENV CONCURRENCY=1
 # video cache - 100MB
 ENV VIDEO_CACHE_SIZE_IN_BYTES=104857600
+
+# Install Python dependencies for Kokoro
+RUN pip3 install --break-system-packages --no-cache-dir kokoro>=0.9.4 soundfile
 
 # install kokoro, headless chrome and ensure music files are present
 RUN node dist/scripts/install.js

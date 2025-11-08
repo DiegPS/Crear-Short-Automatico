@@ -4,14 +4,17 @@ import {
   transcribe,
 } from "@remotion/install-whisper-cpp";
 import path from "path";
+import fs from "fs-extra";
 
 import { Config } from "../../config";
-import type { Caption } from "../../types/shorts";
+import type { Caption, whisperModels } from "../../types/shorts";
 import { logger } from "../../logger";
 
 export const ErrorWhisper = new Error("There was an error with WhisperCpp");
 
 export class Whisper {
+  private verifiedModels: Set<string> = new Set();
+
   constructor(private config: Config) {}
 
   /**
@@ -84,6 +87,68 @@ export class Whisper {
     return new Whisper(config);
   }
 
+  /**
+   * Obtiene la ruta del archivo del modelo
+   */
+  private getModelPath(modelName: string): string {
+    // Los modelos de whisper.cpp se guardan como ggml-{model}.bin
+    return path.join(
+      this.config.whisperInstallPath,
+      "models",
+      `ggml-${modelName}.bin`
+    );
+  }
+
+  /**
+   * Verifica si el modelo existe en el sistema de archivos
+   */
+  private async modelExists(modelName: string): Promise<boolean> {
+    const modelPath = this.getModelPath(modelName);
+    return await fs.pathExists(modelPath);
+  }
+
+  /**
+   * Asegura que el modelo esté descargado. Si no existe, lo descarga automáticamente.
+   */
+  private async ensureModelDownloaded(modelName: string): Promise<void> {
+    // Si ya verificamos este modelo, no hacer nada
+    if (this.verifiedModels.has(modelName)) {
+      return;
+    }
+
+    // Verificar si el modelo existe
+    const exists = await this.modelExists(modelName);
+    if (exists) {
+      this.verifiedModels.add(modelName);
+      logger.debug({ model: modelName }, "Model already exists");
+      return;
+    }
+
+    // Descargar el modelo si no existe
+    logger.info({ model: modelName }, "Model not found, downloading...");
+    try {
+      await downloadWhisperModel({
+        model: modelName as whisperModels,
+        folder: path.join(this.config.whisperInstallPath, "models"),
+        printOutput: this.config.whisperVerbose,
+        onProgress: (downloadedBytes, totalBytes) => {
+          const progress = `${Math.round((downloadedBytes / totalBytes) * 100)}%`;
+          logger.info(
+            { progress, model: modelName },
+            "Downloading Whisper model",
+          );
+        },
+      });
+      this.verifiedModels.add(modelName);
+      logger.info({ model: modelName }, "Model downloaded successfully");
+    } catch (error) {
+      logger.error({ error, model: modelName }, "Error downloading model");
+      throw new Error(
+        `Failed to download Whisper model "${modelName}". Please ensure you have internet connection and sufficient disk space. Original error: ${error instanceof Error ? error.message : String(error)}`
+      );
+    }
+  }
+
   // todo shall we extract it to a Caption class?
   async CreateCaption(audioPath: string, language?: string | null): Promise<Caption[]> {
     // Usar el idioma pasado como parámetro, o el de la configuración global, o null (auto-detect)
@@ -91,6 +156,9 @@ export class Whisper {
     // Seleccionar el modelo apropiado basado en el idioma
     const modelToUse = this.getModelForLanguage(targetLanguage);
     logger.debug({ audioPath, language: targetLanguage, model: modelToUse }, "Starting to transcribe audio");
+    
+    // Asegurar que el modelo esté descargado antes de usarlo
+    await this.ensureModelDownloaded(modelToUse);
     
     // Construir las opciones base
     const transcribeOptions: any = {
