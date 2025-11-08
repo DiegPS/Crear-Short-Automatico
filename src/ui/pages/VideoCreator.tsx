@@ -206,7 +206,8 @@ const VideoCreator: React.FC = () => {
   const uploadAudioMutation = useMutation({
     mutationFn: uploadAudio,
     onSuccess: () => {
-      refetchAudios();
+      // Invalidar el caché globalmente para que todos los componentes se actualicen
+      queryClient.invalidateQueries({ queryKey: ["audios"] });
     },
   });
 
