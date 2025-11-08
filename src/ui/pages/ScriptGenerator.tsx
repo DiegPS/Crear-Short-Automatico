@@ -1,7 +1,5 @@
 import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { useMutation } from "@tanstack/react-query";
-import axios from "axios";
 import {
   Box,
   Button,
@@ -29,22 +27,6 @@ import CheckCircleIcon from "@mui/icons-material/CheckCircle";
 import ArrowBackIcon from "@mui/icons-material/ArrowBack";
 import { splitTextIntoScenes } from "./VideoCreator";
 
-interface GenerateScriptResponse {
-  scripts: string[];
-  topic: string;
-  language: string;
-}
-
-const generateScript = async (data: {
-  topic: string;
-  language: string;
-  videoType: "short" | "long";
-  numScripts: number;
-}): Promise<GenerateScriptResponse> => {
-  const response = await axios.post("/api/generate-script", data);
-  return response.data;
-};
-
 const ScriptGenerator: React.FC = () => {
   const navigate = useNavigate();
   const [topic, setTopic] = useState<string>("");
@@ -53,21 +35,118 @@ const ScriptGenerator: React.FC = () => {
   const [selectedScript, setSelectedScript] = useState<string | null>(null);
   const [editedScript, setEditedScript] = useState<string>("");
   const [editDialogOpen, setEditDialogOpen] = useState(false);
-
-  const generateMutation = useMutation({
-    mutationFn: generateScript,
-  });
+  const [scripts, setScripts] = useState<string[]>([]);
+  const [isGenerating, setIsGenerating] = useState(false);
+  const [generationProgress, setGenerationProgress] = useState<{ current: number; total: number } | null>(null);
+  const [generationError, setGenerationError] = useState<string | null>(null);
 
   const handleGenerate = () => {
-    if (!topic.trim()) {
+    if (!topic.trim() || isGenerating) {
       return;
     }
-    generateMutation.mutate({
-      topic: topic.trim(),
-      language,
-      videoType,
-      numScripts: videoType === "short" ? 3 : 1,
-    });
+
+    // Resetear estado
+    setScripts([]);
+    setGenerationError(null);
+    setGenerationProgress(null);
+    setIsGenerating(true);
+
+    const numScripts = videoType === "short" ? 3 : 1;
+
+    // Usar fetch con streaming para recibir eventos SSE
+    fetch("/api/generate-script", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        topic: topic.trim(),
+        language,
+        videoType,
+        numScripts,
+      }),
+    })
+      .then((response) => {
+        if (!response.ok) {
+          throw new Error(`HTTP error! status: ${response.status}`);
+        }
+
+        const reader = response.body?.getReader();
+        const decoder = new TextDecoder();
+
+        if (!reader) {
+          throw new Error("No response body");
+        }
+
+        let buffer = "";
+        let currentEvent = "";
+
+        const processStream = (): Promise<void> => {
+          return reader.read().then(({ done, value }) => {
+            if (done) {
+              setIsGenerating(false);
+              return;
+            }
+
+            buffer += decoder.decode(value, { stream: true });
+            const lines = buffer.split("\n");
+            buffer = lines.pop() || ""; // Mantener la línea incompleta en el buffer
+
+            for (let i = 0; i < lines.length; i++) {
+              const line = lines[i].trim();
+              
+              if (line.startsWith("event: ")) {
+                currentEvent = line.substring(7).trim();
+                continue;
+              }
+
+              if (line.startsWith("data: ")) {
+                try {
+                  const data = JSON.parse(line.substring(6));
+
+                  if (currentEvent === "start" || data.topic) {
+                    // Evento start
+                    setGenerationProgress({ current: 0, total: data.numScripts || data.total });
+                  } else if (currentEvent === "progress" || data.current !== undefined) {
+                    // Evento progress
+                    setGenerationProgress({ current: data.current, total: data.total });
+                  } else if (currentEvent === "script" || data.script !== undefined) {
+                    // Evento script
+                    setScripts((prev) => {
+                      const newScripts = [...prev];
+                      const index = data.index !== undefined ? data.index : prev.length;
+                      newScripts[index] = data.script;
+                      return newScripts;
+                    });
+                  } else if (currentEvent === "error" || data.error) {
+                    // Evento error
+                    setGenerationError(data.error);
+                    setIsGenerating(false);
+                  } else if (currentEvent === "complete" || data.total !== undefined) {
+                    // Evento complete
+                    setIsGenerating(false);
+                    setGenerationProgress(null);
+                  }
+                } catch (e) {
+                  // Ignorar errores de parsing
+                }
+                currentEvent = ""; // Reset después de procesar data
+              } else if (line === "") {
+                // Línea vacía separa eventos
+                currentEvent = "";
+              }
+            }
+
+            return processStream();
+          });
+        };
+
+        return processStream();
+      })
+      .catch((error) => {
+        setGenerationError(error.message || "Error al generar los guiones");
+        setIsGenerating(false);
+      });
   };
 
   const handleSelectScript = (script: string) => {
@@ -167,9 +246,9 @@ const ScriptGenerator: React.FC = () => {
               variant="contained"
               size="large"
               onClick={handleGenerate}
-              disabled={!topic.trim() || generateMutation.isPending}
+              disabled={!topic.trim() || isGenerating}
               startIcon={
-                generateMutation.isPending ? (
+                isGenerating ? (
                   <CircularProgress size={20} />
                 ) : (
                   <AutoAwesomeIcon />
@@ -177,29 +256,30 @@ const ScriptGenerator: React.FC = () => {
               }
               sx={{ minWidth: 200 }}
             >
-              {generateMutation.isPending
-                ? "Generando Guiones..."
+              {isGenerating
+                ? generationProgress
+                  ? `Generando... (${generationProgress.current}/${generationProgress.total})`
+                  : "Generando Guiones..."
                 : "Generar Guiones con IA"}
             </Button>
           </Grid>
         </Grid>
       </Paper>
 
-      {generateMutation.isError && (
+      {generationError && (
         <Alert severity="error" sx={{ mb: 3 }}>
-          {generateMutation.error instanceof Error
-            ? generateMutation.error.message
-            : "Error al generar los guiones. Asegúrate de que GOOGLE_GENERATIVE_AI_API_KEY esté configurada."}
+          {generationError}
         </Alert>
       )}
 
-      {generateMutation.isSuccess && generateMutation.data.scripts.length > 0 && (
+      {scripts.length > 0 && (
         <Box>
           <Typography variant="h6" sx={{ mb: 2 }}>
-            Guiones Generados ({generateMutation.data.scripts.length})
+            Guiones Generados ({scripts.length}
+            {generationProgress && ` / ${generationProgress.total}`})
           </Typography>
           <Grid container spacing={2}>
-            {generateMutation.data.scripts.map((script, index) => (
+            {scripts.map((script, index) => (
               <Grid item xs={12} md={6} key={index}>
                 <Card
                   sx={{

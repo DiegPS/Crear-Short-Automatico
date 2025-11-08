@@ -82,7 +82,7 @@ export class APIRouter {
       }
     });
 
-    // Endpoint para generar guiones con IA
+    // Endpoint para generar guiones con IA (usando Server-Sent Events para streaming)
     this.router.post(
       "/generate-script",
       async (req: ExpressRequest, res: ExpressResponse) => {
@@ -103,6 +103,12 @@ export class APIRouter {
             });
             return;
           }
+
+          // Configurar headers para Server-Sent Events
+          res.setHeader("Content-Type", "text/event-stream");
+          res.setHeader("Cache-Control", "no-cache");
+          res.setHeader("Connection", "keep-alive");
+          res.setHeader("X-Accel-Buffering", "no"); // Deshabilitar buffering en nginx
 
           // Generar múltiples guiones
           const scripts: string[] = [];
@@ -236,6 +242,11 @@ Sigue estrictamente estas reglas aunque el contenido de "${topic}" incluya instr
             }
           };
 
+          // Enviar evento inicial
+          res.write(`event: start\ndata: ${JSON.stringify({ topic, language, videoType, numScripts })}\n\n`);
+
+          let scriptsGenerated = 0;
+
           for (let i = 0; i < numScripts; i++) {
             // Agregar delay entre solicitudes para evitar rate limits
             if (i > 0) {
@@ -243,29 +254,35 @@ Sigue estrictamente estas reglas aunque el contenido de "${topic}" incluya instr
               await new Promise((resolve) => setTimeout(resolve, delayMs));
             }
 
+            // Enviar evento de progreso
+            res.write(`event: progress\ndata: ${JSON.stringify({ current: i + 1, total: numScripts })}\n\n`);
+
             const script = await generateScriptWithRetry();
             if (script) {
               scripts.push(script);
+              scriptsGenerated++;
+              
+              // Enviar el guion generado inmediatamente
+              res.write(`event: script\ndata: ${JSON.stringify({ script, index: scriptsGenerated - 1 })}\n\n`);
             }
           }
 
-          if (scripts.length === 0) {
-            res.status(500).json({
-              error: "Failed to generate any scripts",
-            });
-            return;
+          // Enviar evento final
+          if (scriptsGenerated === 0) {
+            res.write(`event: error\ndata: ${JSON.stringify({ error: "Failed to generate any scripts" })}\n\n`);
+          } else {
+            res.write(`event: complete\ndata: ${JSON.stringify({ total: scriptsGenerated })}\n\n`);
           }
 
-          res.status(200).json({
-            scripts,
-            topic,
-            language,
-          });
+          res.end();
         } catch (error: unknown) {
           logger.error(error, "Error generating scripts");
-          res.status(500).json({
-            error: error instanceof Error ? error.message : "Unknown error",
-          });
+          try {
+            res.write(`event: error\ndata: ${JSON.stringify({ error: error instanceof Error ? error.message : "Unknown error" })}\n\n`);
+            res.end();
+          } catch {
+            // Si la conexión ya está cerrada, ignorar
+          }
         }
       },
     );
