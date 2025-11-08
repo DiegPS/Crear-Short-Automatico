@@ -120,7 +120,7 @@ const createVideo = async (data: { scenes: SceneInput[] | KenBurstSceneInput[]; 
   return response.data;
 };
 
-const steps = ["Scenes", "Configuration", "Review"];
+const steps = ["Escenas", "Configuración", "Revisar"];
 
 // Función para dividir texto automáticamente en escenas
 const splitTextIntoScenes = (text: string): string[] => {
@@ -422,10 +422,10 @@ const VideoCreator: React.FC = () => {
   return (
     <Box maxWidth="lg" mx="auto" py={4} className="fade-in">
       <Typography variant="h4" component="h1" gutterBottom sx={{ fontWeight: 700, mb: 1 }}>
-        Create New Video
+        Crear Nuevo Video
       </Typography>
       <Typography variant="body2" color="text.secondary" sx={{ mb: 4 }}>
-        Create engaging short videos with AI-powered text-to-speech, captions, and background music
+        Crea videos cortos atractivos con conversión de texto a voz con IA, subtítulos y música de fondo
       </Typography>
 
       <Box display="flex" justifyContent="center" mb={4}>
@@ -452,11 +452,11 @@ const VideoCreator: React.FC = () => {
         >
           <ToggleButton value="regular">
             <VideoCameraBackIcon sx={{ mr: 1 }} />
-            Regular Video
+            Video Regular
           </ToggleButton>
           <ToggleButton value="ken-burst">
             <ImageIcon sx={{ mr: 1 }} />
-            Ken Burns Video
+            Video Ken Burns
           </ToggleButton>
         </ToggleButtonGroup>
       </Box>
@@ -471,7 +471,7 @@ const VideoCreator: React.FC = () => {
 
       {error && (
         <Alert severity="error" sx={{ mb: 3 }} onClose={() => createVideoMutation.reset()}>
-          {error instanceof Error ? error.message : "Failed to create video. Please try again."}
+          {error instanceof Error ? error.message : "Error al crear el video. Por favor, intenta de nuevo."}
         </Alert>
       )}
 
@@ -482,15 +482,15 @@ const VideoCreator: React.FC = () => {
               <Paper sx={{ p: 4, mb: 3 }}>
                 <Box display="flex" justifyContent="space-between" alignItems="center" mb={3}>
                   <Typography variant="h5" component="h2" sx={{ fontWeight: 600 }}>
-                    Video Scenes
+                    Escenas del Video
                   </Typography>
                   <Box display="flex" gap={2} alignItems="center">
                     <Chip 
-                      label={`${scenes.length} ${scenes.length === 1 ? 'scene' : 'scenes'}`} 
+                      label={`${scenes.length} ${scenes.length === 1 ? 'escena' : 'escenas'}`} 
                       color="primary" 
                     />
                     <Chip 
-                      label={sceneMode === "auto" ? "Auto Mode" : "Manual Mode"} 
+                      label={sceneMode === "auto" ? "Modo Automático" : "Modo Manual"} 
                       color={sceneMode === "auto" ? "success" : "default"}
                       size="small"
                     />
@@ -503,7 +503,7 @@ const VideoCreator: React.FC = () => {
                   sx={{ mb: 3 }}
                 >
                   <Tab 
-                    label="Auto Generate" 
+                    label="Generar Automáticamente" 
                     value="auto" 
                     icon={<AutoAwesomeIcon />}
                     iconPosition="start"
@@ -520,24 +520,24 @@ const VideoCreator: React.FC = () => {
                   <Box mb={4}>
                     <Paper variant="outlined" sx={{ p: 3, mb: 3, bgcolor: 'background.default' }}>
                       <Typography variant="h6" gutterBottom sx={{ fontWeight: 600, mb: 2 }}>
-                        Paste Your Full Text
+                        Pega Tu Texto Completo
                       </Typography>
                             <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-                        Paste your complete text here. The system will automatically split it into scenes 
-                        when it detects a period followed by a line break (".\n"). Each scene will become 
-                        a separate video segment.
+                        Pega tu texto completo aquí. El sistema lo dividirá automáticamente en escenas 
+                        cuando detecte un punto seguido de un salto de línea (".\n"). Cada escena se convertirá 
+                        en un segmento de video separado.
                       </Typography>
                       
                       <Grid container spacing={3}>
                         <Grid item xs={12} md={6}>
                           <TextField
                             fullWidth
-                            label="Full Text"
+                            label="Texto Completo"
                             multiline
                             rows={10}
                             value={fullText}
                             onChange={(e) => handleFullTextChange(e.target.value)}
-                            placeholder="Paste your complete text here...&#10;&#10;For example:&#10;&#10;This is the first scene.&#10;&#10;This is the second scene.&#10;&#10;This is the third scene."
+                            placeholder="Pega tu texto completo aquí...&#10;&#10;Por ejemplo:&#10;&#10;Esta es la primera escena.&#10;&#10;Esta es la segunda escena.&#10;&#10;Esta es la tercera escena."
                             sx={{
                               '& .MuiInputBase-root': {
                                 fontFamily: 'monospace',
@@ -548,11 +548,11 @@ const VideoCreator: React.FC = () => {
                           
                           <TextField
                             fullWidth
-                            label="Background Video Keywords"
+                            label="Palabras Clave del Video de Fondo"
                             value={globalKeywords}
                             onChange={(e) => setGlobalKeywords(e.target.value)}
-                            placeholder="war, tension, nuke"
-                            helperText="Enter keywords separated by commas. These will be distributed to all scenes in rotating order (each scene will have all keywords but in different order)."
+                            placeholder="guerra, tensión, nuclear"
+                            helperText="Ingresa palabras clave separadas por comas. Estas se distribuirán a todas las escenas en orden rotativo (cada escena tendrá todas las palabras clave pero en diferente orden)."
                             sx={{ mt: 2 }}
                             InputProps={{
                               startAdornment: (
@@ -571,7 +571,7 @@ const VideoCreator: React.FC = () => {
                               disabled={!fullText.trim()}
                               fullWidth
                             >
-                              Generate Scenes
+                              Generar Escenas
                             </Button>
                             <Button
                               variant="outlined"
@@ -581,15 +581,15 @@ const VideoCreator: React.FC = () => {
                                 setScenes([{ text: "", searchTerms: "" }]);
                               }}
                             >
-                              Clear
+                              Limpiar
                             </Button>
                           </Box>
                           {fullText.trim() && (
                             <Alert severity="info" sx={{ mt: 2 }}>
-                              {splitTextIntoScenes(fullText).length} scenes will be generated
+                              Se generarán {splitTextIntoScenes(fullText).length} escenas
                               {globalKeywords.trim() && (
                                 <Box component="span" sx={{ ml: 1 }}>
-                                  with rotating keywords: {globalKeywords.split(',').map(k => k.trim()).filter(k => k).join(', ')}
+                                  con palabras clave rotativas: {globalKeywords.split(',').map(k => k.trim()).filter(k => k).join(', ')}
                                 </Box>
                               )}
                             </Alert>
@@ -609,7 +609,7 @@ const VideoCreator: React.FC = () => {
                             }}
                           >
                             <Typography variant="subtitle2" gutterBottom sx={{ fontWeight: 600 }}>
-                              Preview: Generated Scenes
+                              Vista Previa: Escenas Generadas
                             </Typography>
                             {scenes.length > 0 && scenes[0].text ? (
                               <Box sx={{ mt: 2 }}>
@@ -620,7 +620,7 @@ const VideoCreator: React.FC = () => {
                                     sx={{ p: 2, mb: 2, bgcolor: 'background.default' }}
                                   >
                                     <Typography variant="caption" color="primary" fontWeight={600}>
-                                      Scene {index + 1}
+                                      Escena {index + 1}
                                     </Typography>
                                     <Typography variant="body2" sx={{ mt: 1, whiteSpace: 'pre-wrap' }}>
                                       {scene.text}
@@ -628,7 +628,7 @@ const VideoCreator: React.FC = () => {
                                     {videoType === "regular" && scene.searchTerms && (
                                       <Box sx={{ mt: 1.5 }}>
                                         <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 0.5 }}>
-                                          Keywords (rotated):
+                                          Palabras clave (rotativas):
                                         </Typography>
                                         <Chip
                                           label={scene.searchTerms}
@@ -643,7 +643,7 @@ const VideoCreator: React.FC = () => {
                               </Box>
                             ) : (
                               <Typography variant="body2" color="text.secondary" sx={{ mt: 2 }}>
-                                Scenes will appear here after clicking "Generate Scenes"
+                                Las escenas aparecerán aquí después de hacer clic en "Generar Escenas"
                               </Typography>
                             )}
                           </Box>
@@ -657,7 +657,7 @@ const VideoCreator: React.FC = () => {
 
                 <Box display="flex" justifyContent="space-between" alignItems="center" mb={3}>
                   <Typography variant="h6" component="h3" sx={{ fontWeight: 600 }}>
-                    Scene Details {scenes.length > 0 && `(${scenes.length})`}
+                    Detalles de Escenas {scenes.length > 0 && `(${scenes.length})`}
                   </Typography>
                   {sceneMode === "manual" && (
                     <Button
@@ -666,7 +666,7 @@ const VideoCreator: React.FC = () => {
                       startIcon={<AddIcon />}
                       onClick={handleAddScene}
                     >
-                      Add Scene
+                      Agregar Escena
                     </Button>
                   )}
                 </Box>
@@ -679,7 +679,7 @@ const VideoCreator: React.FC = () => {
                   >
                     <Box display="flex" justifyContent="space-between" alignItems="center" mb={2}>
                       <Typography variant="h6" sx={{ fontWeight: 600 }}>
-                        Scene {index + 1}
+                        Escena {index + 1}
                       </Typography>
                       {scenes.length > 1 && (
                         <IconButton
@@ -729,7 +729,7 @@ const VideoCreator: React.FC = () => {
                         {(scene.audioMode || "text") === "text" ? (
                           <TextField
                             fullWidth
-                            label="Text (Narration)"
+                            label="Texto (Narración)"
                             multiline
                             rows={4}
                             value={scene.text}
@@ -737,7 +737,7 @@ const VideoCreator: React.FC = () => {
                               handleSceneChange(index, "text", e.target.value)
                             }
                             required
-                            helperText="The text that will be converted to speech using Kokoro"
+                            helperText="El texto que se convertirá a voz usando Kokoro"
                             error={!scene.text.trim()}
                           />
                         ) : (
@@ -797,15 +797,15 @@ const VideoCreator: React.FC = () => {
                         <Grid item xs={12}>
                           <TextField
                             fullWidth
-                            label="Search Terms"
+                            label="Términos de Búsqueda"
                             value={scene.searchTerms}
                             onChange={(e) =>
                               handleSceneChange(index, "searchTerms", e.target.value)
                             }
-                            helperText="Enter keywords for background video, separated by commas (e.g., nature, ocean, sunset)"
+                            helperText="Ingresa palabras clave para el video de fondo, separadas por comas (ej: naturaleza, océano, atardecer)"
                             required
                             error={!scene.searchTerms.trim()}
-                            placeholder="nature, ocean, sunset"
+                            placeholder="naturaleza, océano, atardecer"
                           />
                         </Grid>
                       ) : (
@@ -884,14 +884,14 @@ const VideoCreator: React.FC = () => {
                       startIcon={<AddIcon />}
                       onClick={handleAddScene}
                     >
-                      Add Scene
+                      Agregar Escena
                     </Button>
                   </Box>
                 )}
 
                 {!validateScenes && (
                   <Alert severity="warning" sx={{ mt: 3 }}>
-                    Please fill in all required fields for each scene before continuing.
+                    Por favor, completa todos los campos requeridos para cada escena antes de continuar.
                   </Alert>
                 )}
               </Paper>
@@ -906,7 +906,7 @@ const VideoCreator: React.FC = () => {
                 <Box display="flex" alignItems="center" mb={3}>
                   <SettingsIcon sx={{ mr: 1, color: 'primary.main' }} />
                   <Typography variant="h5" component="h2" sx={{ fontWeight: 600 }}>
-                    Video Configuration
+                    Configuración del Video
                   </Typography>
                 </Box>
 
@@ -915,7 +915,7 @@ const VideoCreator: React.FC = () => {
                     <TextField
                       fullWidth
                       type="number"
-                      label="End Screen Padding"
+                      label="Tiempo de Espera Final"
                       value={config.paddingBack}
                       onChange={(e) =>
                         handleConfigChange("paddingBack", parseInt(e.target.value) || 0)
@@ -923,18 +923,18 @@ const VideoCreator: React.FC = () => {
                       InputProps={{
                         endAdornment: <InputAdornment position="end">ms</InputAdornment>,
                       }}
-                      helperText="Duration to keep playing after narration ends"
+                      helperText="Duración para seguir reproduciendo después de que termine la narración"
                       required
                     />
                   </Grid>
 
                   <Grid item xs={12} sm={6}>
                     <FormControl fullWidth>
-                      <InputLabel>Music Mood</InputLabel>
+                      <InputLabel>Estado de Ánimo de la Música</InputLabel>
                       <Select
                         value={config.music}
                         onChange={(e) => handleConfigChange("music", e.target.value)}
-                        label="Music Mood"
+                        label="Estado de Ánimo de la Música"
                         required
                       >
                         {musicTags.map((tag) => (
@@ -948,13 +948,13 @@ const VideoCreator: React.FC = () => {
 
                   <Grid item xs={12} sm={6}>
                     <FormControl fullWidth>
-                      <InputLabel>Caption Position</InputLabel>
+                      <InputLabel>Posición de los Subtítulos</InputLabel>
                       <Select
                         value={config.captionPosition}
                         onChange={(e) =>
                           handleConfigChange("captionPosition", e.target.value)
                         }
-                        label="Caption Position"
+                        label="Posición de los Subtítulos"
                         required
                       >
                         {Object.values(CaptionPositionEnum).map((position) => (
@@ -969,23 +969,23 @@ const VideoCreator: React.FC = () => {
                   <Grid item xs={12} sm={6}>
                     <TextField
                       fullWidth
-                      label="Caption Background Color"
+                      label="Color de Fondo de los Subtítulos"
                       value={config.captionBackgroundColor}
                       onChange={(e) =>
                         handleConfigChange("captionBackgroundColor", e.target.value)
                       }
-                      helperText="Any valid CSS color (name, hex, rgba)"
+                      helperText="Cualquier color CSS válido (nombre, hex, rgba)"
                       required
                     />
                   </Grid>
 
                   <Grid item xs={12} sm={6}>
                     <FormControl fullWidth>
-                      <InputLabel>Voice</InputLabel>
+                      <InputLabel>Voz</InputLabel>
                       <Select
                         value={config.voice}
                         onChange={(e) => handleConfigChange("voice", e.target.value)}
-                        label="Voice"
+                        label="Voz"
                         required
                       >
                         {voices.map((voice) => (
@@ -999,13 +999,13 @@ const VideoCreator: React.FC = () => {
 
                   <Grid item xs={12} sm={6}>
                     <FormControl fullWidth>
-                      <InputLabel>Orientation</InputLabel>
+                      <InputLabel>Orientación</InputLabel>
                       <Select
                         value={config.orientation}
                         onChange={(e) =>
                           handleConfigChange("orientation", e.target.value)
                         }
-                        label="Orientation"
+                        label="Orientación"
                         required
                       >
                         {Object.values(OrientationEnum).map((orientation) => (
@@ -1019,13 +1019,13 @@ const VideoCreator: React.FC = () => {
 
                   <Grid item xs={12} sm={6}>
                     <FormControl fullWidth>
-                      <InputLabel>Music Volume</InputLabel>
+                      <InputLabel>Volumen de la Música</InputLabel>
                       <Select
                         value={config.musicVolume}
                         onChange={(e) =>
                           handleConfigChange("musicVolume", e.target.value)
                         }
-                        label="Music Volume"
+                        label="Volumen de la Música"
                         required
                       >
                         {Object.values(MusicVolumeEnum).map((volume) => (
@@ -1049,46 +1049,46 @@ const VideoCreator: React.FC = () => {
                 <Box display="flex" alignItems="center" mb={3}>
                   <CheckCircleIcon sx={{ mr: 1, color: 'success.main' }} />
                   <Typography variant="h5" component="h2" sx={{ fontWeight: 600 }}>
-                    Review & Create
+                    Revisar y Crear
                   </Typography>
                 </Box>
 
                 <Alert severity="info" sx={{ mb: 3 }}>
-                  Review your settings below. Click "Create Video" to start the generation process.
+                  Revisa tu configuración a continuación. Haz clic en "Crear Video" para iniciar el proceso de generación.
                 </Alert>
 
                 <Box mb={3}>
                   <Typography variant="subtitle2" color="text.secondary" gutterBottom>
-                    Video Type
+                    Tipo de Video
                   </Typography>
                   <Chip 
-                    label={videoType === "regular" ? "Regular Video" : "Ken Burns Video"} 
+                    label={videoType === "regular" ? "Video Regular" : "Video Ken Burns"} 
                     color="primary" 
                   />
                 </Box>
 
                 <Box mb={3}>
                   <Typography variant="subtitle2" color="text.secondary" gutterBottom>
-                    Number of Scenes
+                    Número de Escenas
                   </Typography>
                   <Typography variant="body1">{scenes.length}</Typography>
                 </Box>
 
                 <Box mb={3}>
                   <Typography variant="subtitle2" color="text.secondary" gutterBottom>
-                    Configuration
+                    Configuración
                   </Typography>
                   <Grid container spacing={2}>
                     <Grid item xs={6} sm={4}>
-                      <Typography variant="body2" color="text.secondary">Voice</Typography>
+                      <Typography variant="body2" color="text.secondary">Voz</Typography>
                       <Typography variant="body1">{config.voice}</Typography>
                     </Grid>
                     <Grid item xs={6} sm={4}>
-                      <Typography variant="body2" color="text.secondary">Music</Typography>
+                      <Typography variant="body2" color="text.secondary">Música</Typography>
                       <Typography variant="body1">{config.music}</Typography>
                     </Grid>
                     <Grid item xs={6} sm={4}>
-                      <Typography variant="body2" color="text.secondary">Orientation</Typography>
+                      <Typography variant="body2" color="text.secondary">Orientación</Typography>
                       <Typography variant="body1">{config.orientation}</Typography>
                     </Grid>
                   </Grid>
@@ -1104,7 +1104,7 @@ const VideoCreator: React.FC = () => {
             onClick={handleBack}
             size="large"
           >
-            Back
+            Atrás
           </Button>
           
           {activeStep < steps.length - 1 ? (
@@ -1114,7 +1114,7 @@ const VideoCreator: React.FC = () => {
               disabled={activeStep === 0 && !validateScenes}
               size="large"
             >
-              Next
+              Siguiente
             </Button>
           ) : (
             <Button
@@ -1135,7 +1135,7 @@ const VideoCreator: React.FC = () => {
                 },
               }}
             >
-              {createVideoMutation.isPending ? "Creating..." : "Create Video"}
+              {createVideoMutation.isPending ? "Creando..." : "Crear Video"}
             </Button>
           )}
         </Box>

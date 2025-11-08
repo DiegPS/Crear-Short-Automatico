@@ -58,7 +58,7 @@ const ImageList: React.FC = () => {
 
   const handleDeleteImage = async (id: string, event: React.MouseEvent<HTMLButtonElement>) => {
     event.stopPropagation();
-    if (window.confirm('Are you sure you want to delete this image?')) {
+    if (window.confirm('¿Estás seguro de que quieres eliminar esta imagen?')) {
       deleteMutation.mutate(id);
     }
   };
@@ -68,7 +68,7 @@ const ImageList: React.FC = () => {
       <Box className="fade-in">
         <Box display="flex" justifyContent="space-between" alignItems="center" mb={4}>
           <Skeleton variant="text" width={200} height={40} />
-          <Skeleton variant="rectangular" width={150} height={40} borderRadius={2} />
+          <Skeleton variant="rectangular" width={150} height={40} sx={{ borderRadius: 2 }} />
         </Box>
         <Grid container spacing={3}>
           {[1, 2, 3, 4].map((i) => (
@@ -88,16 +88,16 @@ const ImageList: React.FC = () => {
 
   if (error) {
     return (
-      <Alert 
-        severity="error" 
-        action={
-          <Button color="inherit" size="small" onClick={() => refetch()}>
-            Retry
-          </Button>
-        }
-      >
-        Failed to load images. Please try again.
-      </Alert>
+        <Alert 
+          severity="error" 
+          action={
+            <Button color="inherit" size="small" onClick={() => refetch()}>
+              Reintentar
+            </Button>
+          }
+        >
+          Error al cargar imágenes. Por favor, intenta de nuevo.
+        </Alert>
     );
   }
 
@@ -106,10 +106,10 @@ const ImageList: React.FC = () => {
       <Box display="flex" justifyContent="space-between" alignItems="center" mb={4} flexWrap="wrap" gap={2}>
         <Box>
           <Typography variant="h4" component="h1" gutterBottom sx={{ fontWeight: 700 }}>
-            Your Images
+            Tus Imágenes
           </Typography>
           <Typography variant="body2" color="text.secondary">
-            {images.length} {images.length === 1 ? 'image' : 'images'} total
+            {images.length} {images.length === 1 ? 'imagen' : 'imágenes'} en total
           </Typography>
         </Box>
         <Button 
@@ -125,7 +125,7 @@ const ImageList: React.FC = () => {
             },
           }}
         >
-          Create New Video
+          Crear Nuevo Video
         </Button>
       </Box>
       
@@ -147,10 +147,10 @@ const ImageList: React.FC = () => {
               }} 
             />
             <Typography variant="h5" gutterBottom color="text.secondary" fontWeight={600}>
-              No images yet
+              Aún no hay imágenes
             </Typography>
             <Typography variant="body1" color="text.secondary" sx={{ mb: 3, maxWidth: 400, mx: 'auto' }}>
-              Upload images to use in Ken Burns videos. You can upload them when creating a video.
+              Sube imágenes para usar en videos Ken Burns. Puedes subirlas al crear un video.
             </Typography>
             <Button 
               variant="contained" 
@@ -164,7 +164,7 @@ const ImageList: React.FC = () => {
                 },
               }}
             >
-              Create Video with Images
+              Crear Video con Imágenes
             </Button>
           </Box>
         </Fade>

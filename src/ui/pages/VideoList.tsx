@@ -66,7 +66,7 @@ const VideoList: React.FC = () => {
 
   const handleDeleteVideo = async (id: string, event: React.MouseEvent<HTMLButtonElement>) => {
     event.stopPropagation();
-    if (window.confirm('Are you sure you want to delete this video?')) {
+    if (window.confirm('¿Estás seguro de que quieres eliminar este video?')) {
       deleteMutation.mutate(id);
     }
   };
@@ -77,25 +77,25 @@ const VideoList: React.FC = () => {
         return {
           icon: <CheckCircleIcon />,
           color: 'success' as const,
-          label: 'Ready',
+          label: 'Listo',
         };
       case 'processing':
         return {
           icon: <HourglassEmptyIcon />,
           color: 'info' as const,
-          label: 'Processing',
+          label: 'Procesando',
         };
       case 'failed':
         return {
           icon: <ErrorIcon />,
           color: 'error' as const,
-          label: 'Failed',
+          label: 'Fallido',
         };
       default:
         return {
           icon: <VideoLibraryIcon />,
           color: 'default' as const,
-          label: 'Unknown',
+          label: 'Desconocido',
         };
     }
   };
@@ -138,16 +138,16 @@ const VideoList: React.FC = () => {
 
   if (error) {
     return (
-      <Alert 
-        severity="error" 
-        action={
-          <Button color="inherit" size="small" onClick={() => refetch()}>
-            Retry
-          </Button>
-        }
-      >
-        Failed to load videos. Please try again.
-      </Alert>
+        <Alert 
+          severity="error" 
+          action={
+            <Button color="inherit" size="small" onClick={() => refetch()}>
+              Reintentar
+            </Button>
+          }
+        >
+          Error al cargar videos. Por favor, intenta de nuevo.
+        </Alert>
     );
   }
 
@@ -156,10 +156,10 @@ const VideoList: React.FC = () => {
       <Box display="flex" justifyContent="space-between" alignItems="center" mb={4} flexWrap="wrap" gap={2}>
         <Box>
           <Typography variant="h4" component="h1" gutterBottom sx={{ fontWeight: 700 }}>
-            Your Videos
+            Tus Videos
           </Typography>
           <Typography variant="body2" color="text.secondary">
-            {videos.length} {videos.length === 1 ? 'video' : 'videos'} total
+            {videos.length} {videos.length === 1 ? 'video' : 'videos'} en total
           </Typography>
         </Box>
         <Button 
@@ -175,7 +175,7 @@ const VideoList: React.FC = () => {
             },
           }}
         >
-          Create New Video
+          Crear Nuevo Video
         </Button>
       </Box>
       
@@ -197,10 +197,10 @@ const VideoList: React.FC = () => {
               }} 
             />
             <Typography variant="h5" gutterBottom color="text.secondary" fontWeight={600}>
-              No videos yet
+              Aún no hay videos
             </Typography>
             <Typography variant="body1" color="text.secondary" sx={{ mb: 3, maxWidth: 400, mx: 'auto' }}>
-              Get started by creating your first short video. It's quick and easy!
+              Comienza creando tu primer video corto. ¡Es rápido y fácil!
             </Typography>
             <Button 
               variant="contained" 
@@ -214,7 +214,7 @@ const VideoList: React.FC = () => {
                 },
               }}
             >
-              Create Your First Video
+              Crea Tu Primer Video
             </Button>
           </Box>
         </Fade>
@@ -289,14 +289,14 @@ const VideoList: React.FC = () => {
                             }}
                             sx={{ mr: 1 }}
                           >
-                            View
+                            Ver
                           </Button>
                         )}
                         {video.status === 'processing' && (
                           <Box display="flex" alignItems="center" gap={1}>
                             <CircularProgress size={16} />
                             <Typography variant="body2" color="text.secondary">
-                              Creating...
+                              Creando...
                             </Typography>
                           </Box>
                         )}

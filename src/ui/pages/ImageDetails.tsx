@@ -58,11 +58,11 @@ const ImageDetails: React.FC = () => {
           severity="error"
           action={
             <Button color="inherit" size="small" onClick={handleBack}>
-              Back
+              Volver
             </Button>
           }
         >
-          Image not found or failed to load.
+          Imagen no encontrada o error al cargar.
         </Alert>
       </Box>
     );
@@ -76,19 +76,19 @@ const ImageDetails: React.FC = () => {
           onClick={handleBack}
           sx={{ mr: 'auto' }}
         >
-          Back to Images
+          Volver a Imágenes
         </Button>
       </Box>
 
       <Typography variant="h4" component="h1" gutterBottom sx={{ fontWeight: 700, mb: 4 }}>
-        Image Details
+        Detalles de la Imagen
       </Typography>
 
       <Paper sx={{ p: { xs: 2, sm: 4 }, mb: 3 }}>
         <Grid container spacing={3} mb={3}>
           <Grid item xs={12}>
             <Typography variant="body2" color="text.secondary" gutterBottom>
-              Image ID
+              ID de la Imagen
             </Typography>
             <Typography 
               variant="body1" 
@@ -98,7 +98,7 @@ const ImageDetails: React.FC = () => {
                 fontWeight: 500,
               }}
             >
-              {imageId || 'Unknown'}
+              {imageId || 'Desconocido'}
             </Typography>
           </Grid>
         </Grid>
@@ -149,7 +149,7 @@ const ImageDetails: React.FC = () => {
                   },
                 }}
               >
-                Download Image
+                Descargar Imagen
               </Button>
             </Box>
           </Box>

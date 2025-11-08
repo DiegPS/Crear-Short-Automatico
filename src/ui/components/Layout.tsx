@@ -165,7 +165,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
                     WebkitTextFillColor: 'transparent',
                   }}
                 >
-                  Short Video Maker
+                  Creador de Videos Cortos
                 </Typography>
               )}
             </Box>
@@ -200,7 +200,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
                   },
                 }}
               >
-                {!isMobile && 'Images'}
+                {!isMobile && 'Imágenes'}
               </Button>
               
               <Button 
@@ -231,7 +231,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
                   },
                 }}
               >
-                {!isMobile && 'Create'}
+                {!isMobile && 'Crear'}
               </Button>
             </Box>
           </Toolbar>
@@ -261,7 +261,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
           }}
         >
           <Typography variant="body2" color="text.secondary">
-            © {new Date().getFullYear()} Short Video Maker. Open source video creation tool.
+            © {new Date().getFullYear()} Creador de Videos Cortos. Herramienta de creación de videos de código abierto.
           </Typography>
         </Box>
       </Box>

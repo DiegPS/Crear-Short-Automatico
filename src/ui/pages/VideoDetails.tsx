@@ -63,29 +63,29 @@ const VideoDetails: React.FC = () => {
         return {
           icon: <CheckCircleIcon />,
           color: 'success' as const,
-          label: 'Ready',
-          description: 'Your video is ready to watch!',
+          label: 'Listo',
+          description: '¡Tu video está listo para ver!',
         };
       case 'processing':
         return {
           icon: <HourglassEmptyIcon />,
           color: 'info' as const,
-          label: 'Processing',
-          description: 'Your video is being created. This may take a few minutes.',
+          label: 'Procesando',
+          description: 'Tu video se está creando. Esto puede tardar unos minutos.',
         };
       case 'failed':
         return {
           icon: <ErrorIcon />,
           color: 'error' as const,
-          label: 'Failed',
-          description: 'Video processing failed. Please try again with different settings.',
+          label: 'Fallido',
+          description: 'El procesamiento del video falló. Por favor, intenta de nuevo con diferentes configuraciones.',
         };
       default:
         return {
           icon: <ErrorIcon />,
           color: 'default' as const,
-          label: 'Unknown',
-          description: 'Unknown status. Please refresh the page.',
+          label: 'Desconocido',
+          description: 'Estado desconocido. Por favor, actualiza la página.',
         };
     }
   };
@@ -108,11 +108,11 @@ const VideoDetails: React.FC = () => {
           severity="error"
           action={
             <Button color="inherit" size="small" onClick={() => refetch()}>
-              Retry
+              Reintentar
             </Button>
           }
         >
-          Failed to fetch video status. Please try again.
+          Error al obtener el estado del video. Por favor, intenta de nuevo.
         </Alert>
       );
     }
@@ -130,7 +130,7 @@ const VideoDetails: React.FC = () => {
               }} 
             />
             <Typography variant="h5" gutterBottom sx={{ fontWeight: 600, mb: 1 }}>
-              Creating your video...
+              Creando tu video...
             </Typography>
             <Typography variant="body1" color="text.secondary" sx={{ mb: 3 }}>
               {statusConfig.description}
@@ -179,7 +179,7 @@ const VideoDetails: React.FC = () => {
                 sx={{ fontWeight: 600, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 1 }}
               >
                 <CheckCircleIcon />
-                Your video is ready!
+                ¡Tu video está listo!
               </Typography>
             </Box>
             
@@ -228,7 +228,7 @@ const VideoDetails: React.FC = () => {
                   },
                 }}
               >
-                Download Video
+                Descargar Video
               </Button>
               <Button
                 variant="outlined"
@@ -236,7 +236,7 @@ const VideoDetails: React.FC = () => {
                 onClick={() => refetch()}
                 size="large"
               >
-                Refresh
+                Actualizar
               </Button>
             </Box>
           </Box>
@@ -256,7 +256,7 @@ const VideoDetails: React.FC = () => {
                 size="small" 
                 onClick={() => navigate('/create')}
               >
-                Create New
+                Crear Nuevo
               </Button>
             }
           >
@@ -281,7 +281,7 @@ const VideoDetails: React.FC = () => {
           onClick={handleBack}
           sx={{ mr: 'auto' }}
         >
-          Back to Videos
+          Volver a Videos
         </Button>
         <Chip
           icon={statusConfig.icon}
@@ -292,14 +292,14 @@ const VideoDetails: React.FC = () => {
       </Box>
 
       <Typography variant="h4" component="h1" gutterBottom sx={{ fontWeight: 700, mb: 4 }}>
-        Video Details
+        Detalles del Video
       </Typography>
 
       <Paper sx={{ p: { xs: 2, sm: 4 }, mb: 3 }}>
         <Grid container spacing={3} mb={3}>
           <Grid item xs={12} sm={6}>
             <Typography variant="body2" color="text.secondary" gutterBottom>
-              Video ID
+              ID del Video
             </Typography>
             <Typography 
               variant="body1" 
@@ -309,12 +309,12 @@ const VideoDetails: React.FC = () => {
                 fontWeight: 500,
               }}
             >
-              {videoId || 'Unknown'}
+              {videoId || 'Desconocido'}
             </Typography>
           </Grid>
           <Grid item xs={12} sm={6}>
             <Typography variant="body2" color="text.secondary" gutterBottom>
-              Status
+              Estado
             </Typography>
             <Box display="flex" alignItems="center" gap={1}>
               <Chip
