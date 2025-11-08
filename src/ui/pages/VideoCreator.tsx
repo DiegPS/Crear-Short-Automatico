@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
-import { useQuery, useMutation } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import axios from "axios";
 import {
   Box,
@@ -154,6 +154,7 @@ const splitTextIntoScenes = (text: string): string[] => {
 
 const VideoCreator: React.FC = () => {
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const [activeStep, setActiveStep] = useState(0);
   const [videoType, setVideoType] = useState<"regular" | "ken-burst">("regular");
   const [videoTitle, setVideoTitle] = useState<string>("");
@@ -197,7 +198,8 @@ const VideoCreator: React.FC = () => {
   const uploadImageMutation = useMutation({
     mutationFn: uploadImage,
     onSuccess: () => {
-      refetchImages();
+      // Invalidar el caché globalmente para que todos los componentes se actualicen
+      queryClient.invalidateQueries({ queryKey: ["images"] });
     },
   });
 
