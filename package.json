@@ -76,6 +76,7 @@
     "react-dom": "^19.1.0",
     "react-router-dom": "^7.5.3",
     "remotion": "^4.0.286",
+    "sql.js": "^1.13.0",
     "zod": "^3.24.2",
     "zod-to-json-schema": "^3.24.5"
   },
@@ -90,6 +91,7 @@
     "@types/nock": "^11.1.0",
     "@types/node": "^22.14.0",
     "@types/react": "^19.1.0",
+    "@types/sql.js": "^1.4.9",
     "@vitejs/plugin-react": "^4.4.1",
     "autoprefixer": "^10.4.16",
     "eslint": "^9.24.0",

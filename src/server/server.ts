@@ -10,21 +10,27 @@ import { APIRouter } from "./routers/rest";
 import { MCPRouter } from "./routers/mcp";
 import { logger } from "../logger";
 import { Config } from "../config";
+import { DatabaseManager } from "../database/database";
 
 export class Server {
   private app: express.Application;
   private config: Config;
+  public database: DatabaseManager;
 
   constructor(config: Config, shortCreator: ShortCreator) {
     this.config = config;
     this.app = express();
+
+    // Inicializar base de datos (se crea automáticamente si no existe)
+    logger.info("Inicializando base de datos SQLite...");
+    this.database = new DatabaseManager(config);
 
     // add healthcheck endpoint
     this.app.get("/health", (req: ExpressRequest, res: ExpressResponse) => {
       res.status(200).json({ status: "ok" });
     });
 
-    const apiRouter = new APIRouter(config, shortCreator);
+    const apiRouter = new APIRouter(config, shortCreator, this.database);
     const mcpRouter = new MCPRouter(shortCreator);
     this.app.use("/api", apiRouter.router);
     this.app.use("/mcp", mcpRouter.router);
@@ -42,7 +48,11 @@ export class Server {
     });
   }
 
-  public start(): http.Server {
+  public async start(): Promise<http.Server> {
+    // Esperar a que la base de datos esté lista antes de iniciar el servidor
+    await this.database.ready();
+    logger.info("Base de datos SQLite lista");
+
     const server = this.app.listen(this.config.port, () => {
       logger.info(
         { port: this.config.port, mcp: "/mcp", api: "/api" },

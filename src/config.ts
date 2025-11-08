@@ -22,7 +22,7 @@ export const logger = pino({
 });
 
 export class Config {
-  private dataDirPath: string;
+  public dataDirPath: string;
   private libsDirPath: string;
   private staticDirPath: string;
 

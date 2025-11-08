@@ -13,6 +13,7 @@ import { ShortCreator } from "../../short-creator/ShortCreator";
 import { logger } from "../../logger";
 import { Config } from "../../config";
 import { KenBurstSceneInput, RenderConfig } from "../../types/shorts";
+import { DatabaseManager } from "../../database/database";
 
 // Extend Express Request type to include files
 interface FileUploadRequest extends ExpressRequest {
@@ -23,11 +24,13 @@ export class APIRouter {
   public router: express.Router;
   private shortCreator: ShortCreator;
   private config: Config;
+  private database: DatabaseManager;
 
-  constructor(config: Config, shortCreator: ShortCreator) {
+  constructor(config: Config, shortCreator: ShortCreator, database: DatabaseManager) {
     this.config = config;
     this.router = express.Router();
     this.shortCreator = shortCreator;
+    this.database = database;
 
     this.router.use(express.json());
     this.router.use(fileUpload());
@@ -35,6 +38,48 @@ export class APIRouter {
   }
 
   private setupRoutes() {
+    // Endpoint para verificar el estado de la base de datos
+    this.router.get("/db/status", async (req: ExpressRequest, res: ExpressResponse) => {
+      try {
+        await this.database.ready();
+        
+        // Obtener estadísticas de la base de datos
+        const videos = this.database.getAllVideos();
+        const images = this.database.getAllImages();
+        const audios = this.database.getAllAudios();
+        
+        res.status(200).json({
+          status: "ok",
+          database: "SQLite (sql.js)",
+          initialized: true,
+          stats: {
+            videos: {
+              total: videos.length,
+              ready: videos.filter(v => v.status === "ready").length,
+              processing: videos.filter(v => v.status === "processing").length,
+              failed: videos.filter(v => v.status === "failed").length,
+            },
+            images: {
+              total: images.length,
+              ready: images.filter(i => i.status === "ready").length,
+              processing: images.filter(i => i.status === "processing").length,
+            },
+            audios: {
+              total: audios.length,
+              ready: audios.filter(a => a.status === "ready").length,
+              processing: audios.filter(a => a.status === "processing").length,
+            },
+          },
+        });
+      } catch (error: unknown) {
+        logger.error(error, "Error checking database status");
+        res.status(500).json({
+          status: "error",
+          message: error instanceof Error ? error.message : "Unknown error",
+        });
+      }
+    });
+
     this.router.post(
       "/short-video",
       async (req: ExpressRequest, res: ExpressResponse) => {
