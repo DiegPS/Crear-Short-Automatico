@@ -215,6 +215,8 @@ const VideoCreator: React.FC = () => {
     mutationFn: (data: { scenes: SceneInput[] | KenBurstSceneInput[]; config: RenderConfig }) =>
       createVideo(data, videoType),
     onSuccess: (data) => {
+      // Invalidar el caché globalmente para que la lista de videos se actualice
+      queryClient.invalidateQueries({ queryKey: ["videos"] });
       navigate(`/video/${data.videoId}`);
     },
   });
