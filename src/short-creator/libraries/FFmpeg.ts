@@ -8,7 +8,7 @@ export class FFMpeg {
     return import("@ffmpeg-installer/ffmpeg").then((ffmpegInstaller) => {
       ffmpeg.setFfmpegPath(ffmpegInstaller.path);
       ffmpeg.setFfprobePath(ffprobe.path);
-      logger.info("FFmpeg path set to:", ffmpegInstaller.path);
+      logger.info({ path: ffmpegInstaller.path }, "FFmpeg path set");
       return new FFMpeg();
     });
   }

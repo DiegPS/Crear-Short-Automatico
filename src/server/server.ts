@@ -17,13 +17,18 @@ export class Server {
   private config: Config;
   public database: DatabaseManager;
 
-  constructor(config: Config, shortCreator: ShortCreator) {
+  constructor(config: Config, shortCreator: ShortCreator, database?: DatabaseManager) {
     this.config = config;
     this.app = express();
 
-    // Inicializar base de datos (se crea automáticamente si no existe)
-    logger.info("Inicializando base de datos SQLite...");
-    this.database = new DatabaseManager(config);
+    // Usar la base de datos proporcionada o crear una nueva si no se proporciona
+    if (database) {
+      this.database = database;
+    } else {
+      // Inicializar base de datos (se crea automáticamente si no existe)
+      logger.info("Inicializando base de datos SQLite...");
+      this.database = new DatabaseManager(config);
+    }
 
     // add healthcheck endpoint
     this.app.get("/health", (req: ExpressRequest, res: ExpressResponse) => {
