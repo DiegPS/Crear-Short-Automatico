@@ -41,8 +41,10 @@ import AutoAwesomeIcon from "@mui/icons-material/AutoAwesome";
 import ContentCopyIcon from "@mui/icons-material/ContentCopy";
 import AudioFileIcon from "@mui/icons-material/AudioFile";
 import RecordVoiceOverIcon from "@mui/icons-material/RecordVoiceOver";
+import FolderOpenIcon from "@mui/icons-material/FolderOpen";
 import Tabs from "@mui/material/Tabs";
 import Tab from "@mui/material/Tab";
+import ImageSelectorDialog from "../components/ImageSelectorDialog";
 import {
   SceneInput,
   RenderConfig,
@@ -160,6 +162,7 @@ const VideoCreator: React.FC = () => {
   const [fullText, setFullText] = useState<string>("");
   const [globalKeywords, setGlobalKeywords] = useState<string>("");
   const [sceneMode, setSceneMode] = useState<"auto" | "manual">("auto");
+  const [imageSelectorOpen, setImageSelectorOpen] = useState<number | null>(null);
   const [config, setConfig] = useState<RenderConfig>({
     paddingBack: 1500,
     music: MusicMoodEnum.chill,
@@ -304,6 +307,16 @@ const VideoCreator: React.FC = () => {
       console.error("Failed to upload image:", err);
     }
   }, [scenes, uploadImageMutation]);
+
+  const handleImageSelect = useCallback((index: number, imageId: string, imageUrl: string) => {
+    const newScenes = [...scenes];
+    newScenes[index] = {
+      ...newScenes[index],
+      imageId,
+      imageUrl,
+    };
+    setScenes(newScenes);
+  }, [scenes]);
 
   const handleAudioUpload = useCallback(async (index: number, file: File) => {
     try {
@@ -798,43 +811,51 @@ const VideoCreator: React.FC = () => {
                       ) : (
                         <Grid item xs={12}>
                           <Box>
-                            <input
-                              accept="image/*"
-                              style={{ display: "none" }}
-                              id={`image-upload-${index}`}
-                              type="file"
-                              onChange={(e) => {
-                                const file = e.target.files?.[0];
-                                if (file) {
-                                  handleImageUpload(index, file);
-                                }
-                              }}
-                            />
-                            <label htmlFor={`image-upload-${index}`}>
+                            <Box display="flex" gap={2} mb={2}>
+                              <input
+                                accept="image/*"
+                                style={{ display: "none" }}
+                                id={`image-upload-${index}`}
+                                type="file"
+                                onChange={(e) => {
+                                  const file = e.target.files?.[0];
+                                  if (file) {
+                                    handleImageUpload(index, file);
+                                  }
+                                }}
+                              />
+                              <label htmlFor={`image-upload-${index}`}>
+                                <Button
+                                  variant="outlined"
+                                  component="span"
+                                  startIcon={
+                                    uploadImageMutation.isPending ? (
+                                      <CircularProgress size={20} />
+                                    ) : (
+                                      <CloudUploadIcon />
+                                    )
+                                  }
+                                  disabled={uploadImageMutation.isPending}
+                                >
+                                  {scene.imageUrl
+                                    ? "Cambiar Imagen"
+                                    : "Subir Imagen"}
+                                </Button>
+                              </label>
                               <Button
                                 variant="outlined"
-                                component="span"
-                                startIcon={
-                                  uploadImageMutation.isPending ? (
-                                    <CircularProgress size={20} />
-                                  ) : (
-                                    <CloudUploadIcon />
-                                  )
-                                }
-                                disabled={uploadImageMutation.isPending}
-                                sx={{ mb: 2 }}
+                                startIcon={<FolderOpenIcon />}
+                                onClick={() => setImageSelectorOpen(index)}
                               >
-                                {scene.imageUrl
-                                  ? "Change Image"
-                                  : "Upload Image"}
+                                Seleccionar Guardada
                               </Button>
-                            </label>
+                            </Box>
                             {scene.imageUrl && (
                               <Fade in>
-                                <Card sx={{ mt: 2 }}>
+                                <Card sx={{ mt: 2, maxWidth: '200px' }}>
                                   <CardMedia
                                     component="img"
-                                    height="200"
+                                    height="120"
                                     image={scene.imageUrl}
                                     alt={`Scene ${index + 1} image`}
                                     sx={{ objectFit: 'contain' }}
@@ -842,6 +863,13 @@ const VideoCreator: React.FC = () => {
                                 </Card>
                               </Fade>
                             )}
+                            <ImageSelectorDialog
+                              open={imageSelectorOpen === index}
+                              onClose={() => setImageSelectorOpen(null)}
+                              onSelect={(imageId, imageUrl) => handleImageSelect(index, imageId, imageUrl)}
+                              availableImages={availableImages}
+                              isLoading={false}
+                            />
                           </Box>
                         </Grid>
                       )}
