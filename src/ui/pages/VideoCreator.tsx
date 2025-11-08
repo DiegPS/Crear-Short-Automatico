@@ -1199,11 +1199,19 @@ const VideoCreator: React.FC = () => {
                         label="Volumen de la Música"
                         required
                       >
-                        {Object.values(MusicVolumeEnum).map((volume) => (
-                          <MenuItem key={volume} value={volume}>
-                            {volume}
-                          </MenuItem>
-                        ))}
+                        {Object.values(MusicVolumeEnum).map((volume) => {
+                          const volumeLabels: Record<MusicVolumeEnum, string> = {
+                            [MusicVolumeEnum.muted]: "Silenciado",
+                            [MusicVolumeEnum.low]: "Bajo",
+                            [MusicVolumeEnum.medium]: "Medio",
+                            [MusicVolumeEnum.high]: "Alto",
+                          };
+                          return (
+                            <MenuItem key={volume} value={volume}>
+                              {volumeLabels[volume]}
+                            </MenuItem>
+                          );
+                        })}
                       </Select>
                     </FormControl>
                   </Grid>
